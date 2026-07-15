@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="secverge_midnight">#050A18</color>
+    <color name="secverge_surface">#0A1628</color>
+    <color name="secverge_surface_high">#0F1F38</color>
+    <color name="secverge_cobalt">#2563EB</color>
+    <color name="secverge_indigo">#4F46E5</color>
+    <color name="secverge_violet">#7C3AED</color>
+    <color name="secverge_cyan">#22D3EE</color>
+    <color name="secverge_text_primary">#F1F5F9</color>
+    <color name="secverge_text_secondary">#94A3B8</color>
+    <color name="secverge_transparent">#00000000</color>
+</resources>

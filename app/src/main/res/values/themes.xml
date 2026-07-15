@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style
+        name="Theme.SECVergeAI"
+        parent="android:style/Theme.Material.NoActionBar">
+
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowBackground">@color/secverge_midnight</item>
+        <item name="android:colorAccent">@color/secverge_cyan</item>
+        <item name="android:navigationBarColor">@color/secverge_midnight</item>
+        <item name="android:statusBarColor">@color/secverge_midnight</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+</resources>

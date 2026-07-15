@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:fillType="evenOdd"
+        android:pathData="M54,20L84,38L84,70L54,88L24,70L24,38ZM54,29L32,42L32,66L54,79L76,66L76,42Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="24"
+                android:startY="20"
+                android:endX="84"
+                android:endY="88">
+                <item
+                    android:offset="0"
+                    android:color="#FF818CF8" />
+                <item
+                    android:offset="0.34"
+                    android:color="#FF22D3EE" />
+                <item
+                    android:offset="0.68"
+                    android:color="#FF6366F1" />
+                <item
+                    android:offset="1"
+                    android:color="#FFC084FC" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FF22D3EE"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M39,47L54,38L69,47L69,61L54,70L39,61Z" />
+
+    <path
+        android:fillColor="#FF818CF8"
+        android:pathData="M54,33A5,5 0,1 0,54 43A5,5 0,1 0,54 33" />
+
+    <path
+        android:fillColor="#FF22D3EE"
+        android:pathData="M34,50A5,5 0,1 0,34 60A5,5 0,1 0,34 50" />
+
+    <path
+        android:fillColor="#FFC084FC"
+        android:pathData="M74,50A5,5 0,1 0,74 60A5,5 0,1 0,74 50" />
+
+    <path
+        android:fillColor="#FF6366F1"
+        android:pathData="M54,66A5,5 0,1 0,54 76A5,5 0,1 0,54 66" />
+
+    <path
+        android:fillColor="#FFF1F5F9"
+        android:pathData="M54,49A6,6 0,1 0,54 61A6,6 0,1 0,54 49" />
+</vector>

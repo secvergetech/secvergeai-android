@@ -1,0 +1,142 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+
+# SECVERGE-GUARDED-EXCLUSIONS
+
+# macOS and Android Studio local files
+.DS_Store
+.idea/
+*.iml
+local.properties
+
+# Gradle, Kotlin, and Android generated output
+.gradle/
+.kotlin/
+**/build/
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+app/release/
+
+# Packaged application output
+*.apk
+*.aab
+*.apks
+
+# Signing material and private credentials
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+signing.properties
+keystore.properties
+secrets.properties
+.env
+.env.*
+!.env.example
+
+# END SECVERGE-GUARDED-EXCLUSIONS
+
+# BEGIN SECVERGE GUARDED GITIGNORE
+
+# macOS
+.DS_Store
+
+# Android Studio
+.idea/
+*.iml
+captures/
+
+# Gradle and Android build output
+.gradle/
+build/
+**/build/
+.externalNativeBuild/
+.cxx/
+
+# Local machine configuration
+local.properties
+**/local.properties
+
+# Secrets and environment files
+.env
+.env.*
+**/.env
+**/.env.*
+secrets.properties
+**/secrets.properties
+signing.properties
+**/signing.properties
+google-services.json
+**/google-services.json
+
+# Signing certificates and private keys
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+
+# Generated application packages
+*.apk
+*.aab
+*.ap_
+
+# Logs
+*.log
+
+# END SECVERGE GUARDED GITIGNORE
+
+# BEGIN SECVERGE SAFE GITIGNORE
+.DS_Store
+.idea/
+*.iml
+.gradle/
+build/
+**/build/
+.externalNativeBuild/
+.cxx/
+local.properties
+**/local.properties
+.env
+.env.*
+**/.env
+**/.env.*
+secrets.properties
+**/secrets.properties
+signing.properties
+**/signing.properties
+google-services.json
+**/google-services.json
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+*.apk
+*.aab
+*.ap_
+*.log
+# END SECVERGE SAFE GITIGNORE
