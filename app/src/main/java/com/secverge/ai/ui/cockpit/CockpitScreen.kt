@@ -19,6 +19,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,7 +28,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
@@ -35,8 +39,8 @@ import com.secverge.ai.ui.components.GlassCard
 import com.secverge.ai.ui.components.GradientButton
 import com.secverge.ai.ui.components.ModelChip
 import com.secverge.ai.ui.components.ModelStatus
-import com.secverge.ai.ui.components.PremiumTopBar
 import com.secverge.ai.ui.components.PremiumErrorCard
+import com.secverge.ai.ui.components.PremiumTopBar
 import com.secverge.ai.ui.theme.Cyan
 import com.secverge.ai.ui.theme.GlassBorder
 import com.secverge.ai.ui.theme.GlassSurface
@@ -46,6 +50,13 @@ import com.secverge.ai.ui.theme.SECVergeGradients
 import com.secverge.ai.ui.theme.TextMuted
 import com.secverge.ai.ui.theme.TextPrimary
 import com.secverge.ai.ui.theme.TextSecondary
+
+private val CockpitModelOptions = listOf(
+    "Ask Hachy",
+    "GPT",
+    "Claude",
+    "Gemini"
+)
 
 @Composable
 fun CockpitScreen(
@@ -116,22 +127,59 @@ fun CockpitScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "From: ${state.fromModel}",
+                    text = "Model Routing",
                     color = TextPrimary,
                     style = MaterialTheme.typography.titleLarge
-                )
-
-                GradientButton(
-                    text = "Swap models",
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = viewModel::swapModels
                 )
 
                 Text(
-                    text = "To: ${state.toModel}",
-                    color = TextPrimary,
-                    style = MaterialTheme.typography.titleLarge
+                    text = "Choose the responding model and the switch target, matching the web UCF cockpit dropdown behavior.",
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodyMedium
                 )
+
+                ModelDropdownField(
+                    title = "Responding model",
+                    selected = state.fromModel,
+                    options = CockpitModelOptions,
+                    enabled = !state.isLoading,
+                    disabledOptions = setOf(state.toModel),
+                    onSelect = viewModel::setFromModel
+                )
+
+                ModelDropdownField(
+                    title = "Switch target",
+                    selected = state.toModel,
+                    options = CockpitModelOptions,
+                    enabled = !state.isLoading,
+                    disabledOptions = setOf(state.fromModel),
+                    onSelect = viewModel::setToModel
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            color = GlassSurface.copy(alpha = 0.72f),
+                            shape = RoundedCornerShape(
+                                SECVergeDimens.RadiusMedium
+                            )
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = GlassBorder,
+                            shape = RoundedCornerShape(
+                                SECVergeDimens.RadiusMedium
+                            )
+                        )
+                        .padding(14.dp)
+                ) {
+                    Text(
+                        text = "From: ${state.fromModel}  →  To: ${state.toModel}",
+                        color = TextSecondary,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
 
                 SegmentSelector(
                     title = "Task type",
@@ -250,6 +298,122 @@ fun CockpitScreen(
                             )
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModelDropdownField(
+    title: String,
+    selected: String,
+    options: List<String>,
+    enabled: Boolean,
+    disabledOptions: Set<String>,
+    onSelect: (String) -> Unit
+) {
+    var expanded by remember {
+        mutableStateOf(false)
+    }
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            text = title,
+            color = TextSecondary,
+            style = MaterialTheme.typography.labelLarge
+        )
+
+        Box(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        color = GlassSurface.copy(alpha = 0.88f),
+                        shape = RoundedCornerShape(
+                            SECVergeDimens.RadiusSmall
+                        )
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = if (expanded) {
+                            Cyan
+                        } else {
+                            GlassBorder
+                        },
+                        shape = RoundedCornerShape(
+                            SECVergeDimens.RadiusSmall
+                        )
+                    )
+                    .clickable(enabled = enabled) {
+                        expanded = true
+                    }
+                    .padding(
+                        horizontal = 14.dp,
+                        vertical = 13.dp
+                    )
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = selected,
+                        color = TextPrimary,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+
+                    Text(
+                        text = if (expanded) {
+                            "▲"
+                        } else {
+                            "▼"
+                        },
+                        color = Cyan,
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+            }
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = {
+                    expanded = false
+                },
+                modifier = Modifier.background(
+                    GlassSurface
+                )
+            ) {
+                options.forEach { option ->
+                    val disabled = disabledOptions.contains(option)
+
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = if (disabled) {
+                                    "$option · already selected"
+                                } else {
+                                    option
+                                },
+                                color = if (disabled) {
+                                    TextMuted
+                                } else {
+                                    TextPrimary
+                                },
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        },
+                        enabled = enabled && !disabled,
+                        onClick = {
+                            expanded = false
+                            onSelect(option)
+                        }
+                    )
                 }
             }
         }

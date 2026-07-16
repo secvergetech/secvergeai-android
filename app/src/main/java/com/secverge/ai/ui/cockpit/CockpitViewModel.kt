@@ -12,40 +12,114 @@ class CockpitViewModel(
     private val repository: CockpitRepository
 ) : ViewModel() {
 
+    private val modelOptions = listOf(
+        "Ask Hachy",
+        "GPT",
+        "Claude",
+        "Gemini"
+    )
+
     private val _uiState = MutableStateFlow(CockpitUiState())
     val uiState: StateFlow<CockpitUiState> = _uiState.asStateFlow()
 
     fun updatePrompt(value: String) {
-        _uiState.update {
-            it.copy(prompt = value, errorMessage = null)
+        _uiState.update { current ->
+            if (current.prompt == value) {
+                current.copy(errorMessage = null)
+            } else {
+                current.copy(
+                    prompt = value,
+                    currentStep = CockpitStep.Context,
+                    snapshotId = null,
+                    switchId = null,
+                    recommendedModel = null,
+                    fidelityScore = null,
+                    errorMessage = null
+                )
+            }
         }
     }
 
     fun setFromModel(value: String) {
-        _uiState.update {
-            it.copy(fromModel = value, errorMessage = null)
+        _uiState.update { current ->
+            val safeTarget = if (value == current.toModel) {
+                fallbackModel(excluding = value)
+            } else {
+                current.toModel
+            }
+
+            current.copy(
+                fromModel = value,
+                toModel = safeTarget,
+                currentStep = CockpitStep.Context,
+                snapshotId = null,
+                switchId = null,
+                recommendedModel = null,
+                fidelityScore = null,
+                errorMessage = null
+            )
         }
     }
 
     fun setToModel(value: String) {
-        _uiState.update {
-            it.copy(toModel = value, errorMessage = null)
+        _uiState.update { current ->
+            if (value == current.fromModel) {
+                current.copy(
+                    errorMessage = "Choose a different switch target."
+                )
+            } else {
+                current.copy(
+                    toModel = value,
+                    currentStep = CockpitStep.Context,
+                    snapshotId = null,
+                    switchId = null,
+                    recommendedModel = null,
+                    fidelityScore = null,
+                    errorMessage = null
+                )
+            }
         }
     }
 
     fun setTaskType(value: String) {
-        _uiState.update { it.copy(taskType = value) }
+        _uiState.update { current ->
+            current.copy(
+                taskType = value,
+                currentStep = CockpitStep.Context,
+                snapshotId = null,
+                switchId = null,
+                recommendedModel = null,
+                fidelityScore = null,
+                errorMessage = null
+            )
+        }
     }
 
     fun setPrivacy(value: String) {
-        _uiState.update { it.copy(privacy = value) }
+        _uiState.update { current ->
+            current.copy(
+                privacy = value,
+                currentStep = CockpitStep.Context,
+                snapshotId = null,
+                switchId = null,
+                recommendedModel = null,
+                fidelityScore = null,
+                errorMessage = null
+            )
+        }
     }
 
     fun swapModels() {
-        _uiState.update {
-            it.copy(
-                fromModel = it.toModel,
-                toModel = it.fromModel
+        _uiState.update { current ->
+            current.copy(
+                fromModel = current.toModel,
+                toModel = current.fromModel,
+                currentStep = CockpitStep.Context,
+                snapshotId = null,
+                switchId = null,
+                recommendedModel = null,
+                fidelityScore = null,
+                errorMessage = null
             )
         }
     }
@@ -97,7 +171,10 @@ class CockpitViewModel(
                 fromModel = state.fromModel,
                 toModel = state.toModel
             ).onSuccess { response ->
-                val recommended = response.recommendedModel ?: state.toModel
+                val recommended = response.recommendedModel
+                    ?.takeIf(String::isNotBlank)
+                    ?.takeUnless { it == state.fromModel }
+                    ?: state.toModel
 
                 _uiState.update {
                     it.copy(
@@ -111,9 +188,9 @@ class CockpitViewModel(
                                     append(recommended)
                                     response.reason
                                         ?.takeIf(String::isNotBlank)
-                                        ?.let {
+                                        ?.let { reason ->
                                             append(" · ")
-                                            append(it)
+                                            append(reason)
                                         }
                                 },
                                 technicalProof = response.raw?.toString()
@@ -197,6 +274,10 @@ class CockpitViewModel(
 
     fun dismissError() {
         _uiState.update { it.copy(errorMessage = null) }
+    }
+
+    private fun fallbackModel(excluding: String): String {
+        return modelOptions.firstOrNull { it != excluding } ?: "GPT"
     }
 
     private fun setLoading() {
