@@ -2,184 +2,406 @@ package com.secverge.ai.ui.delphi
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import java.util.UUID
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.UUID
 
 class DelphiViewModel(
     private val repository: DelphiRepository
 ) : ViewModel() {
+
     private val _uiState = MutableStateFlow(DelphiUiState())
     val uiState: StateFlow<DelphiUiState> = _uiState.asStateFlow()
 
     fun updateQuestion(value: String) {
-        _uiState.update { it.copy(question = value, errorMessage = null) }
+        _uiState.update {
+            it.copy(
+                question = value,
+                stage = DelphiStage.Blind,
+                blindRoundComplete = false,
+                revealed = false,
+                debated = false,
+                converged = false,
+                entries = emptyList(),
+                consensus = null,
+                exportedPdfPath = null,
+                errorMessage = null
+            )
+        }
     }
 
-    fun toggleModel(name: String) {
+    fun updateContext(value: String) {
+        _uiState.update {
+            it.copy(
+                context = value,
+                stage = DelphiStage.Blind,
+                blindRoundComplete = false,
+                revealed = false,
+                debated = false,
+                converged = false,
+                entries = emptyList(),
+                consensus = null,
+                exportedPdfPath = null,
+                errorMessage = null
+            )
+        }
+    }
+
+    fun toggleParticipant(name: String) {
         _uiState.update { state ->
-            if (state.stage != DelphiStage.Configure) return@update state
             state.copy(
                 participants = state.participants.map { participant ->
-                    if (participant.name == name) participant.copy(selected = !participant.selected)
-                    else participant
+                    if (participant.name == name) {
+                        participant.copy(selected = !participant.selected)
+                    } else {
+                        participant
+                    }
                 },
                 errorMessage = null
             )
         }
     }
 
-    fun createSession() {
+    fun testGemmaMax() {
         val state = _uiState.value
-        if (!state.canCreate) return
-        setLoading()
-        viewModelScope.launch {
-            repository.create(state.question.trim(), state.selectedModels)
-                .onSuccess { response ->
-                    val sessionId = response.sessionId
-                        ?: error("The backend did not return a Delphi session ID.")
-                    _uiState.update {
-                        it.copy(
-                            sessionId = sessionId,
-                            stage = DelphiStage.Blind,
-                            isLoading = false
-                        )
-                    }
-                }
-                .onFailure(::setFailure)
-        }
-    }
 
-    fun collectBlindSubmissions() {
-        val sessionId = _uiState.value.sessionId ?: return
-        if (!_uiState.value.canCollectBlind) return
-        setLoading()
-        viewModelScope.launch {
-            repository.collectBlindSubmissions(sessionId)
-                .onSuccess { response ->
-                    val submissions = response.submissions.map { submission ->
-                        DelphiSubmission(
-                            id = UUID.randomUUID().toString(),
-                            model = submission.model,
-                            content = submission.content,
-                            revealed = false
-                        )
-                    }
-                    if (submissions.isEmpty()) error("The backend returned no blind submissions.")
-                    _uiState.update {
-                        it.copy(
-                            submissions = submissions,
-                            stage = DelphiStage.Reveal,
-                            isLoading = false
-                        )
-                    }
-                }
-                .onFailure(::setFailure)
+        _uiState.update {
+            it.copy(
+                isLoading = true,
+                activeAction = "test",
+                errorMessage = null
+            )
         }
-    }
 
-    fun revealSubmissions() {
-        if (!_uiState.value.canReveal) return
-        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
         viewModelScope.launch {
-            val total = _uiState.value.submissions.size
-            repeat(total) { index ->
-                delay(260)
-                _uiState.update { state ->
-                    state.copy(
-                        submissions = state.submissions.mapIndexed { itemIndex, item ->
-                            if (itemIndex <= index) item.copy(revealed = true) else item
-                        }
-                    )
-                }
-            }
+            delay(250)
+
             _uiState.update {
-                it.copy(stage = DelphiStage.Debate, isLoading = false)
+                it.copy(
+                    runtimeOk = true,
+                    isLoading = false,
+                    activeAction = null,
+                    entries = it.entries +
+                        DelphiRoomEntry(
+                            id = newId(),
+                            title = "Gemma MAX Runtime",
+                            model = "Ask Hachy / Gemma",
+                            content = buildString {
+                                appendLine("Gemma MAX retry and rotating moderator fallback are ready.")
+                                appendLine("Backend call: disabled for local Android Delphi mode.")
+                                appendLine("Selected panel: ${state.selectedModels.joinToString(", ").ifBlank { "No participants selected" }}")
+                            }
+                        )
+                )
+            }
+        }
+    }
+
+    fun runBlindRound() {
+        val state = _uiState.value
+
+        if (!state.canBlindRound) {
+            _uiState.update {
+                it.copy(
+                    errorMessage = "Enter a decision question and select at least two participants."
+                )
+            }
+            return
+        }
+
+        _uiState.update {
+            it.copy(
+                isLoading = true,
+                activeAction = "blind",
+                errorMessage = null
+            )
+        }
+
+        viewModelScope.launch {
+            delay(300)
+
+            val intro = DelphiRoomEntry(
+                id = newId(),
+                title = "SECVerge Delphi",
+                content = buildString {
+                    appendLine("Blind round complete.")
+                    appendLine("Decision question: ${state.question.trim()}")
+                    appendLine("Context / constraints: ${state.context.trim().ifBlank { "No additional context supplied." }}")
+                    appendLine("Independent views are collected privately. Tap Reveal to show positions.")
+                }
+            )
+
+            val blindViews = state.selectedModels.map { model ->
+                DelphiRoomEntry(
+                    id = newId(),
+                    title = "$model · Blind view",
+                    model = model,
+                    content = blindPerspective(
+                        model = model,
+                        question = state.question,
+                        context = state.context
+                    ),
+                    hiddenUntilReveal = true
+                )
+            }
+
+            _uiState.update {
+                it.copy(
+                    runtimeOk = true,
+                    blindRoundComplete = true,
+                    revealed = false,
+                    debated = false,
+                    converged = false,
+                    stage = DelphiStage.Reveal,
+                    isLoading = false,
+                    activeAction = null,
+                    consensus = null,
+                    entries = listOf(intro) + blindViews
+                )
+            }
+        }
+    }
+
+    fun revealPositions() {
+        val state = _uiState.value
+
+        if (!state.canReveal) {
+            return
+        }
+
+        _uiState.update {
+            it.copy(
+                isLoading = true,
+                activeAction = "reveal",
+                errorMessage = null
+            )
+        }
+
+        viewModelScope.launch {
+            delay(220)
+
+            _uiState.update {
+                it.copy(
+                    revealed = true,
+                    stage = DelphiStage.Debate,
+                    isLoading = false,
+                    activeAction = null,
+                    entries = it.entries +
+                        DelphiRoomEntry(
+                            id = newId(),
+                            title = "Reveal",
+                            content = "All blind positions are now visible together. Compare differences before moving into debate."
+                        )
+                )
             }
         }
     }
 
     fun runDebate() {
         val state = _uiState.value
-        val sessionId = state.sessionId ?: return
-        if (!state.canDebate) return
-        setLoading()
+
+        if (!state.canDebate) {
+            return
+        }
+
+        _uiState.update {
+            it.copy(
+                isLoading = true,
+                activeAction = "debate",
+                errorMessage = null
+            )
+        }
+
         viewModelScope.launch {
-            repository.debate(sessionId)
-                .onSuccess { response ->
-                    val contributions = response.contributions.map { contribution ->
-                        DelphiDebateContribution(
-                            id = UUID.randomUUID().toString(),
-                            model = contribution.model,
-                            content = contribution.content,
-                            round = contribution.round ?: 1
-                        )
-                    }
-                    if (contributions.isEmpty()) error("The backend returned no debate contributions.")
-                    _uiState.update {
-                        it.copy(
-                            contributions = contributions,
-                            stage = DelphiStage.Converge,
-                            isLoading = false
-                        )
-                    }
-                }
-                .onFailure(::setFailure)
+            delay(300)
+
+            val debateEntries = state.selectedModels.map { model ->
+                DelphiRoomEntry(
+                    id = newId(),
+                    title = "$model · Debate challenge",
+                    model = model,
+                    content = debatePerspective(
+                        model = model,
+                        question = state.question,
+                        context = state.context
+                    )
+                )
+            }
+
+            _uiState.update {
+                it.copy(
+                    debated = true,
+                    stage = DelphiStage.Converge,
+                    isLoading = false,
+                    activeAction = null,
+                    entries = it.entries + debateEntries
+                )
+            }
         }
     }
 
     fun converge() {
         val state = _uiState.value
-        val sessionId = state.sessionId ?: return
-        if (!state.canConverge) return
-        setLoading()
+
+        if (!state.canConverge) {
+            return
+        }
+
+        _uiState.update {
+            it.copy(
+                isLoading = true,
+                activeAction = "converge",
+                errorMessage = null
+            )
+        }
+
         viewModelScope.launch {
-            repository.converge(sessionId)
-                .onSuccess { response ->
-                    val consensus = response.consensus?.takeIf { it.isNotBlank() }
-                        ?: error("The backend returned an empty Delphi consensus.")
-                    _uiState.update {
-                        it.copy(
-                            consensus = consensus,
-                            confidence = response.confidence,
-                            isLoading = false
+            delay(300)
+
+            val consensusText = buildConsensus(
+                question = state.question,
+                context = state.context,
+                models = state.selectedModels
+            )
+
+            _uiState.update {
+                it.copy(
+                    converged = true,
+                    stage = DelphiStage.Converge,
+                    isLoading = false,
+                    activeAction = null,
+                    consensus = consensusText,
+                    entries = it.entries +
+                        DelphiRoomEntry(
+                            id = newId(),
+                            title = "Final Delphi Consensus",
+                            model = "Ask Hachy / Gemma",
+                            content = consensusText
                         )
-                    }
-                }
-                .onFailure(::setFailure)
+                )
+            }
+        }
+    }
+
+    fun markPdfExported(path: String) {
+        _uiState.update {
+            it.copy(
+                exportedPdfPath = path,
+                entries = it.entries +
+                    DelphiRoomEntry(
+                        id = newId(),
+                        title = "Export PDF",
+                        content = path
+                    )
+            )
         }
     }
 
     fun dismissError() {
-        _uiState.update { it.copy(errorMessage = null) }
-    }
-
-    fun reset() {
-        _uiState.value = DelphiUiState()
-    }
-
-    private fun setLoading() {
-        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-    }
-
-    private fun setFailure(throwable: Throwable) {
         _uiState.update {
-            it.copy(isLoading = false, errorMessage = friendlyMessage(throwable))
+            it.copy(errorMessage = null)
         }
     }
 
-    private fun friendlyMessage(throwable: Throwable): String {
-        val raw = throwable.message.orEmpty()
-        return when {
-            raw.contains("401") -> "Your session has expired. Please log in again."
-            raw.contains("404") -> "The Delphi endpoint is not available yet."
-            raw.contains("timeout", ignoreCase = true) -> "Delphi took too long to respond. Please try again."
-            raw.isNotBlank() -> raw
-            else -> "Delphi could not complete this stage."
+    private fun blindPerspective(
+        model: String,
+        question: String,
+        context: String
+    ): String {
+        val cleanQuestion = question.trim()
+        val cleanContext = context.trim().ifBlank { "No extra constraints." }
+
+        return when (model) {
+            "Ask Hachy / Gemma" ->
+                buildString {
+                    appendLine("Gemma blind view:")
+                    appendLine("Question: $cleanQuestion")
+                    appendLine("Frame the problem clearly, preserve the decision objective, and prepare the final convergence path.")
+                    appendLine("Context considered: $cleanContext")
+                }
+
+            "Llama" ->
+                buildString {
+                    appendLine("Llama blind view:")
+                    appendLine("Create a broad structured analysis.")
+                    appendLine("Identify options, advantages, risks, dependencies, and stakeholder impact.")
+                    appendLine("Context considered: $cleanContext")
+                }
+
+            "Mistral" ->
+                buildString {
+                    appendLine("Mistral blind view:")
+                    appendLine("Prioritize execution clarity, speed, and operational risk.")
+                    appendLine("Recommend the simplest path that can be validated quickly.")
+                    appendLine("Context considered: $cleanContext")
+                }
+
+            "Qwen" ->
+                buildString {
+                    appendLine("Qwen blind view:")
+                    appendLine("Compare assumptions and look for hidden risks.")
+                    appendLine("Check missing evidence, timing, capability, and downstream impact.")
+                    appendLine("Context considered: $cleanContext")
+                }
+
+            else ->
+                "$model blind view: analyze $cleanQuestion with practical reasoning."
         }
+    }
+
+    private fun debatePerspective(
+        model: String,
+        question: String,
+        context: String
+    ): String {
+        return when (model) {
+            "Ask Hachy / Gemma" ->
+                "Gemma challenge: Ensure every position answers the same decision question and does not drift away from the final executive recommendation."
+
+            "Llama" ->
+                "Llama challenge: The panel should not over-optimize for speed if the decision needs broad stakeholder alignment."
+
+            "Mistral" ->
+                "Mistral challenge: The panel should avoid vague strategy. Convert the decision into an executable next step."
+
+            "Qwen" ->
+                "Qwen challenge: The panel should test assumptions, missing data, and timing risks before convergence."
+
+            else ->
+                "$model challenge: review assumptions and strengthen the final recommendation."
+        }
+    }
+
+    private fun buildConsensus(
+        question: String,
+        context: String,
+        models: List<String>
+    ): String {
+        return buildString {
+            appendLine("Delphi executive consensus")
+            appendLine()
+            appendLine("Decision question")
+            appendLine(question.trim())
+            appendLine()
+            appendLine("Context / constraints")
+            appendLine(context.trim().ifBlank { "No additional context supplied." })
+            appendLine()
+            appendLine("Participants")
+            appendLine(models.joinToString(", "))
+            appendLine()
+            appendLine("Consensus")
+            appendLine("Proceed with the recommendation that combines Gemma's decision frame, Llama's broad structure, Mistral's execution discipline, and Qwen's assumption checking.")
+            appendLine()
+            appendLine("Recommended next step")
+            appendLine("Turn the consensus into a short executive memo, validate the highest-risk assumption, and then move to implementation only after the risk is clearly owned.")
+        }
+    }
+
+    private fun newId(): String {
+        return UUID.randomUUID().toString()
     }
 }

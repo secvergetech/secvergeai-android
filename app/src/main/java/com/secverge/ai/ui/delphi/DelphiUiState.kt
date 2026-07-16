@@ -1,64 +1,97 @@
 package com.secverge.ai.ui.delphi
 
-data class DelphiParticipant(
-    val name: String,
-    val selected: Boolean = true
-)
-
 data class DelphiSubmission(
-    val id: String,
     val model: String,
     val content: String,
     val revealed: Boolean = false
 )
 
-data class DelphiDebateContribution(
-    val id: String,
-    val model: String,
-    val content: String,
-    val round: Int
+data class DelphiParticipant(
+    val name: String,
+    val selected: Boolean = true
 )
 
-enum class DelphiStage {
-    Configure,
-    Blind,
-    Reveal,
-    Debate,
-    Converge
+data class DelphiRoomEntry(
+    val id: String,
+    val title: String,
+    val model: String? = null,
+    val content: String,
+    val hiddenUntilReveal: Boolean = false
+)
+
+enum class DelphiStage(
+    val label: String,
+    val subtitle: String
+) {
+    Blind(
+        label = "1. Blind",
+        subtitle = "Independent views"
+    ),
+    Reveal(
+        label = "2. Reveal",
+        subtitle = "Show positions"
+    ),
+    Debate(
+        label = "3. Debate",
+        subtitle = "Challenge assumptions"
+    ),
+    Converge(
+        label = "4. Converge",
+        subtitle = "Rotating moderator"
+    )
 }
 
 data class DelphiUiState(
     val question: String = "",
+    val context: String = "",
     val participants: List<DelphiParticipant> = listOf(
-        DelphiParticipant("GPT"),
-        DelphiParticipant("Claude"),
-        DelphiParticipant("Gemini"),
-        DelphiParticipant("Llama")
+        DelphiParticipant("Ask Hachy / Gemma"),
+        DelphiParticipant("Llama"),
+        DelphiParticipant("Mistral"),
+        DelphiParticipant("Qwen")
     ),
-    val sessionId: String? = null,
-    val stage: DelphiStage = DelphiStage.Configure,
-    val submissions: List<DelphiSubmission> = emptyList(),
-    val contributions: List<DelphiDebateContribution> = emptyList(),
+    val stage: DelphiStage = DelphiStage.Blind,
+    val runtimeOk: Boolean = false,
+    val blindRoundComplete: Boolean = false,
+    val revealed: Boolean = false,
+    val debated: Boolean = false,
+    val converged: Boolean = false,
+    val entries: List<DelphiRoomEntry> = emptyList(),
     val consensus: String? = null,
-    val confidence: Double? = null,
+    val exportedPdfPath: String? = null,
     val isLoading: Boolean = false,
+    val activeAction: String? = null,
     val errorMessage: String? = null
 ) {
     val selectedModels: List<String>
-        get() = participants.filter { it.selected }.map { it.name }
+        get() = participants
+            .filter { it.selected }
+            .map { it.name }
 
-    val canCreate: Boolean
-        get() = question.isNotBlank() && selectedModels.size >= 2 && !isLoading
+    val canTestGemmaMax: Boolean
+        get() = !isLoading
 
-    val canCollectBlind: Boolean
-        get() = sessionId != null && stage == DelphiStage.Blind && !isLoading
+    val canBlindRound: Boolean
+        get() = question.isNotBlank() &&
+            selectedModels.size >= 2 &&
+            !isLoading
 
     val canReveal: Boolean
-        get() = submissions.isNotEmpty() && stage == DelphiStage.Reveal && !isLoading
+        get() = blindRoundComplete &&
+            !revealed &&
+            !isLoading
 
     val canDebate: Boolean
-        get() = submissions.all { it.revealed } && submissions.isNotEmpty() && stage == DelphiStage.Debate && !isLoading
+        get() = revealed &&
+            !debated &&
+            !isLoading
 
     val canConverge: Boolean
-        get() = contributions.isNotEmpty() && stage == DelphiStage.Converge && !isLoading
+        get() = debated &&
+            !converged &&
+            !isLoading
+
+    val canExportPdf: Boolean
+        get() = entries.isNotEmpty() &&
+            !isLoading
 }

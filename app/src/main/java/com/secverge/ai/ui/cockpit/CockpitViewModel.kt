@@ -13,11 +13,11 @@ class CockpitViewModel(
 ) : ViewModel() {
 
     private val modelOptions = listOf(
-        "Ask Hachy / Gemma",
-        "GPT",
-        "Claude",
-        "Gemini"
-    )
+    "Ask Hachy / Gemma",
+    "Llama",
+    "Mistral",
+    "Qwen"
+)
 
     private val _uiState = MutableStateFlow(CockpitUiState())
     val uiState: StateFlow<CockpitUiState> = _uiState.asStateFlow()
@@ -75,13 +75,13 @@ class CockpitViewModel(
         val state = _uiState.value
         if (!state.canSend) return
 
-        setLoading()
+        setLoading("send")
 
         viewModelScope.launch {
             repository.execute(
                 switchId = null,
                 prompt = state.prompt.trim(),
-                model = state.fromModel
+                model = toBackendModel(state.fromModel)
             ).onSuccess { response ->
                 val output = response.output
                     ?.takeIf(String::isNotBlank)
@@ -92,6 +92,7 @@ class CockpitViewModel(
                 _uiState.update {
                     it.copy(
                         isLoading = false,
+                        activeAction = null,
                         consoleEntries = it.consoleEntries +
                             CockpitConsoleEntry(
                                 title = state.fromModel,
@@ -108,27 +109,30 @@ class CockpitViewModel(
         val state = _uiState.value
         if (!state.canSwitchAndCarry) return
 
-        setLoading()
+        setLoading("switch")
+
+        val sourceModel = toBackendModel(state.fromModel)
+        val targetModel = toBackendModel(state.toModel)
 
         viewModelScope.launch {
             repository.buildContext(
                 prompt = state.prompt.trim(),
-                fromModel = state.fromModel
+                fromModel = sourceModel
             ).onSuccess { snapshot ->
                 val snapshotId = snapshot.snapshotId
                     ?: error("The backend did not return a context snapshot ID.")
 
                 repository.switchModel(
                     snapshotId = snapshotId,
-                    fromModel = state.fromModel,
-                    toModel = state.toModel
+                    fromModel = sourceModel,
+                    toModel = targetModel
                 ).onSuccess { switchResponse ->
                     val switchId = switchResponse.switchId
 
                     repository.execute(
                         switchId = switchId,
                         prompt = state.prompt.trim(),
-                        model = state.toModel
+                        model = targetModel
                     ).onSuccess { executeResponse ->
                         val output = executeResponse.output
                             ?.takeIf(String::isNotBlank)
@@ -145,6 +149,7 @@ class CockpitViewModel(
                                 fidelityScore = switchResponse.fidelityScore
                                     ?: snapshot.fidelityScore,
                                 isLoading = false,
+                                activeAction = null,
                                 consoleEntries = it.consoleEntries +
                                     CockpitConsoleEntry(
                                         title = "${state.fromModel} → ${state.toModel}",
@@ -171,25 +176,16 @@ class CockpitViewModel(
         }
     }
 
-    fun showAdvanced() {
+    fun recordLocalMessage(
+        title: String,
+        content: String
+    ) {
         _uiState.update {
             it.copy(
                 consoleEntries = it.consoleEntries +
                     CockpitConsoleEntry(
-                        title = "Advanced",
-                        content = "Website parity mode is active. Android UCF now keeps only Responding Model, Switch Target, Send, Switch & Carry, Advanced, History, and Download PDF on the main screen."
-                    )
-            )
-        }
-    }
-
-    fun showPdfStatus() {
-        _uiState.update {
-            it.copy(
-                consoleEntries = it.consoleEntries +
-                    CockpitConsoleEntry(
-                        title = "Download PDF",
-                        content = "PDF export button is now present for website parity. Mobile PDF export will connect when the PDF endpoint is available."
+                        title = title,
+                        content = content
                     )
             )
         }
@@ -202,13 +198,24 @@ class CockpitViewModel(
     }
 
     private fun fallbackModel(excluding: String): String {
-        return modelOptions.firstOrNull { it != excluding } ?: "GPT"
+        return modelOptions.firstOrNull { it != excluding } ?: "Llama"
     }
 
-    private fun setLoading() {
+    private fun toBackendModel(displayModel: String): String {
+        return when (displayModel) {
+            "Ask Hachy / Gemma" -> "Ask Hachy"
+            "Llama" -> "llama"
+            "Mistral" -> "mistral"
+            "Qwen" -> "qwen"
+            else -> displayModel
+        }
+    }
+
+    private fun setLoading(action: String) {
         _uiState.update {
             it.copy(
                 isLoading = true,
+                activeAction = action,
                 errorMessage = null
             )
         }
@@ -218,6 +225,7 @@ class CockpitViewModel(
         _uiState.update {
             it.copy(
                 isLoading = false,
+                activeAction = null,
                 errorMessage = friendlyError(throwable)
             )
         }
