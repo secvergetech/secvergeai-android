@@ -1,16 +1,7 @@
 package com.secverge.ai.ui.cockpit
 
-import android.content.ContentValues
-import android.content.Context
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.pdf.PdfDocument
-import android.os.Build
-import android.os.Environment
-import android.provider.MediaStore
-import android.widget.Toast
+import android.text.format.DateFormat
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,14 +9,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -40,13 +30,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.secverge.ai.ui.components.GlassCard
 import com.secverge.ai.ui.components.PremiumErrorCard
@@ -55,40 +46,27 @@ import com.secverge.ai.ui.theme.Cyan
 import com.secverge.ai.ui.theme.GlassBorder
 import com.secverge.ai.ui.theme.GlassSurface
 import com.secverge.ai.ui.theme.MidnightCanvas
+import com.secverge.ai.ui.theme.MidnightSurfaceHigh
 import com.secverge.ai.ui.theme.SECVergeDimens
 import com.secverge.ai.ui.theme.SECVergeGradients
 import com.secverge.ai.ui.theme.TextMuted
 import com.secverge.ai.ui.theme.TextPrimary
 import com.secverge.ai.ui.theme.TextSecondary
-import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-
-private val WebsiteUcfModels = listOf(
-    "Ask Hachy / Gemma",
-    "Llama",
-    "Mistral",
-    "Qwen"
-)
+import com.secverge.ai.ui.theme.Violet
 
 @Composable
 fun CockpitScreen(
     viewModel: CockpitViewModel
 ) {
     val state by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
-    val expandedEntries = remember { mutableStateMapOf<Int, Boolean>() }
-    var showHistory by remember { mutableStateOf(true) }
+    val haptic = LocalHapticFeedback.current
+    val expandedEntries = remember { mutableStateMapOf<String, Boolean>() }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MidnightCanvas)
             .imePadding()
-            .navigationBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(SECVergeDimens.Space3),
         verticalArrangement = Arrangement.spacedBy(SECVergeDimens.Space3)
@@ -101,182 +79,185 @@ fun CockpitScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Text(
                     text = "Unified Context Cockpit",
-                    style = MaterialTheme.typography.headlineLarge.copy(
+                    style = MaterialTheme.typography.headlineMedium.copy(
                         brush = SECVergeGradients.Signature
                     )
                 )
 
                 Text(
-                    text = "Chat normally, or use Switch & Carry to move the same context into another AI model without re-explaining.",
+                    text = "Ask with one model, then carry the same context into another model without retyping everything.",
                     color = TextSecondary,
                     style = MaterialTheme.typography.bodyMedium
                 )
 
-                WebsiteModelDropdown(
-                    title = "Responding Model",
-                    selected = state.fromModel,
-                    options = WebsiteUcfModels,
-                    disabledOptions = setOf(state.toModel),
-                    enabled = !state.isLoading,
-                    onSelect = viewModel::setFromModel
+                UcfModelControls(
+                    state = state,
+                    onFromModel = viewModel::setFromModel,
+                    onToModel = viewModel::setToModel,
+                    onSwap = {
+                        haptic.performHapticFeedback(
+                            HapticFeedbackType.TextHandleMove
+                        )
+                        viewModel.swapModels()
+                    }
                 )
 
-                WebsiteModelDropdown(
-                    title = "Switch Target",
-                    selected = state.toModel,
-                    options = WebsiteUcfModels,
-                    disabledOptions = setOf(state.fromModel),
-                    enabled = !state.isLoading,
-                    onSelect = viewModel::setToModel
+                UcfCompactStatus(
+                    fromModel = state.fromModel,
+                    toModel = state.toModel,
+                    isReadyToSwitch = state.consoleEntries.isNotEmpty()
                 )
             }
         }
 
-        UcfInputCard(
+        UcfSearchCard(
             state = state,
             onPromptChange = viewModel::updatePrompt,
-            onSend = viewModel::send,
-            onSwitchAndCarry = viewModel::switchAndCarry,
-            onHistory = {
-                showHistory = !showHistory
+            onSend = {
+                haptic.performHapticFeedback(
+                    HapticFeedbackType.TextHandleMove
+                )
+                viewModel.send()
             },
-            onDownloadPdf = {
-                val result = runCatching {
-                    createUcfPdf(
-                        context = context,
-                        state = state
-                    )
-                }.fold(
-                    onSuccess = { it },
-                    onFailure = {
-                        "PDF export failed: ${it.message ?: "Unknown error"}"
-                    }
+            onSwitchAndCarry = {
+                haptic.performHapticFeedback(
+                    HapticFeedbackType.TextHandleMove
                 )
-
-                viewModel.recordLocalMessage(
-                    title = "Download PDF",
-                    content = result
+                viewModel.switchAndCarry()
+            },
+            onHistory = {
+                haptic.performHapticFeedback(
+                    HapticFeedbackType.TextHandleMove
                 )
-
-                Toast.makeText(
-                    context,
-                    result,
-                    Toast.LENGTH_LONG
-                ).show()
+                viewModel.toggleHistory()
+            },
+            onNewSession = {
+                haptic.performHapticFeedback(
+                    HapticFeedbackType.TextHandleMove
+                )
+                viewModel.startNewSession()
             }
         )
 
-        GlassCard(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 230.dp)
+        AnimatedVisibility(
+            visible = state.isHistoryVisible
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Text(
-                    text = "Conversation",
-                    color = TextPrimary,
-                    style = MaterialTheme.typography.titleLarge
-                )
-
-                AnimatedVisibility(visible = state.errorMessage != null) {
-                    PremiumErrorCard(
-                        title = "UCF operation interrupted",
-                        message = state.errorMessage.orEmpty(),
-                        dismissLabel = "Dismiss",
-                        onDismiss = viewModel::dismissError
+            UcfHistoryPanel(
+                sessions = state.savedSessions,
+                activeSessionId = state.activeSessionId,
+                onOpen = {
+                    haptic.performHapticFeedback(
+                        HapticFeedbackType.TextHandleMove
                     )
+                    viewModel.loadSession(it)
+                },
+                onDelete = {
+                    haptic.performHapticFeedback(
+                        HapticFeedbackType.TextHandleMove
+                    )
+                    viewModel.deleteSession(it)
                 }
+            )
+        }
 
-                if (!showHistory) {
-                    Text(
-                        text = "History is hidden. Tap History to show it again.",
-                        color = TextSecondary,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                } else if (state.consoleEntries.isEmpty()) {
-                    Text(
-                        text = "Start with Gemma. Switch when needed.",
-                        color = TextPrimary,
-                        style = MaterialTheme.typography.titleMedium
-                    )
+        AnswersConversationPanel(
+            state = state,
+            expandedEntries = expandedEntries,
+            onDismissError = viewModel::dismissError
+        )
+    }
+}
 
-                    Text(
-                        text = "Use Send for normal chat. Use Switch & Carry when you want SECVerge AI to carry context into the target model.",
-                        color = TextSecondary,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+@Composable
+private fun UcfModelControls(
+    state: CockpitUiState,
+    onFromModel: (String) -> Unit,
+    onToModel: (String) -> Unit,
+    onSwap: () -> Unit
+) {
+    val options = state.modelOptions.ifEmpty { DefaultCockpitModelOptions }
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        WebsiteModelDropdown(
+            title = "Responding Model",
+            selected = state.fromModel,
+            options = options,
+            disabledOptions = setOf(state.toModel),
+            enabled = !state.isLoading,
+            onSelect = onFromModel
+        )
+
+        WebsiteSecondaryButton(
+            text = "⇅ Swap models",
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !state.isLoading,
+            onClick = onSwap
+        )
+
+        WebsiteModelDropdown(
+            title = "Switch Target",
+            selected = state.toModel,
+            options = options,
+            disabledOptions = setOf(state.fromModel),
+            enabled = !state.isLoading,
+            onSelect = onToModel
+        )
+    }
+}
+
+@Composable
+private fun UcfCompactStatus(
+    fromModel: String,
+    toModel: String,
+    isReadyToSwitch: Boolean
+) {
+    GlassCard(
+        modifier = Modifier.fillMaxWidth(),
+        elevated = false
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Current flow",
+                color = TextMuted,
+                style = MaterialTheme.typography.labelLarge
+            )
+
+            Text(
+                text = "$fromModel → $toModel",
+                color = TextPrimary,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Text(
+                text = if (isReadyToSwitch) {
+                    "You already have conversation context. You can now use Switch & Carry."
                 } else {
-                    state.consoleEntries.forEachIndexed { index, entry ->
-                        GlassCard(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .animateContentSize(),
-                            elevated = false
-                        ) {
-                            Column(
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Text(
-                                    text = entry.title,
-                                    color = TextPrimary,
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-
-                                Text(
-                                    text = entry.content,
-                                    color = TextSecondary,
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-
-                                entry.technicalProof?.let { proof ->
-                                    Text(
-                                        text = if (expandedEntries[index] == true) {
-                                            "Hide technical proof"
-                                        } else {
-                                            "Show technical proof"
-                                        },
-                                        color = Cyan,
-                                        modifier = Modifier.clickable {
-                                            expandedEntries[index] =
-                                                expandedEntries[index] != true
-                                        },
-                                        style = MaterialTheme.typography.labelLarge
-                                    )
-
-                                    AnimatedVisibility(
-                                        visible = expandedEntries[index] == true
-                                    ) {
-                                        Text(
-                                            text = proof,
-                                            color = TextMuted,
-                                            style = MaterialTheme.typography.bodySmall
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+                    "Start by asking a question in the Search / Chat box below."
+                },
+                color = Cyan,
+                style = MaterialTheme.typography.bodySmall
+            )
         }
     }
 }
 
 @Composable
-private fun UcfInputCard(
+private fun UcfSearchCard(
     state: CockpitUiState,
     onPromptChange: (String) -> Unit,
     onSend: () -> Unit,
     onSwitchAndCarry: () -> Unit,
     onHistory: () -> Unit,
-    onDownloadPdf: () -> Unit
+    onNewSession: () -> Unit
 ) {
     GlassCard(
         modifier = Modifier.fillMaxWidth()
@@ -284,11 +265,43 @@ private fun UcfInputCard(
         Column(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            CockpitPromptField(
+            Text(
+                text = "Search / Chat",
+                color = TextPrimary,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Text(
+                text = "Search here or chat here. Ask your question clearly and get the answer below.",
+                color = TextSecondary,
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            Text(
+                text = "Active model: ${state.fromModel}",
+                color = Cyan,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Medium
+            )
+
+            UcfPromptField(
                 value = state.prompt,
                 enabled = !state.isLoading,
                 onValueChange = onPromptChange
             )
+
+            if (state.prompt.isBlank()) {
+                Text(
+                    text = if (state.consoleEntries.isNotEmpty()) {
+                        "Prompt is empty. Switch & Carry will use the current visible conversation."
+                    } else {
+                        "Type your first question here."
+                    },
+                    color = TextMuted,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -296,8 +309,8 @@ private fun UcfInputCard(
             ) {
                 WebsitePrimaryButton(
                     text = when (state.activeAction) {
-                        "send" -> "Sending…"
-                        else -> "Send"
+                        "send" -> "Getting Answer..."
+                        else -> "Get Answer"
                     },
                     enabled = state.canSend,
                     modifier = Modifier.weight(1f),
@@ -306,11 +319,11 @@ private fun UcfInputCard(
 
                 WebsitePrimaryButton(
                     text = when (state.activeAction) {
-                        "switch" -> "Switching…"
+                        "switch" -> "Carrying..."
                         else -> "Switch & Carry"
                     },
                     enabled = state.canSwitchAndCarry,
-                    modifier = Modifier.weight(1.35f),
+                    modifier = Modifier.weight(1f),
                     onClick = onSwitchAndCarry
                 )
             }
@@ -320,17 +333,294 @@ private fun UcfInputCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 WebsiteSecondaryButton(
-                    text = "History",
+                    text = if (state.savedSessions.isEmpty()) {
+                        "Recents"
+                    } else {
+                        "Recents ${state.savedSessions.size}"
+                    },
                     modifier = Modifier.weight(1f),
                     enabled = !state.isLoading,
                     onClick = onHistory
                 )
 
                 WebsiteSecondaryButton(
-                    text = "Download PDF",
-                    modifier = Modifier.weight(1.3f),
+                    text = "New UCF Chat",
+                    modifier = Modifier.weight(1f),
                     enabled = !state.isLoading,
-                    onClick = onDownloadPdf
+                    onClick = onNewSession
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun UcfHistoryPanel(
+    sessions: List<CockpitSavedSession>,
+    activeSessionId: String?,
+    onOpen: (String) -> Unit,
+    onDelete: (String) -> Unit
+) {
+    GlassCard(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Recent UCF Chats",
+                color = TextPrimary,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Text(
+                text = "Open your saved UCF conversations here.",
+                color = TextMuted,
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            if (sessions.isEmpty()) {
+                Text(
+                    text = "No recent UCF chats yet.",
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            } else {
+                sessions.forEach { session ->
+                    UcfSessionRow(
+                        session = session,
+                        isActive = session.localId == activeSessionId,
+                        onOpen = { onOpen(session.localId) },
+                        onDelete = { onDelete(session.localId) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UcfSessionRow(
+    session: CockpitSavedSession,
+    isActive: Boolean,
+    onOpen: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val shape = RoundedCornerShape(18.dp)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                color = MidnightSurfaceHigh.copy(
+                    alpha = if (isActive) 0.76f else 0.46f
+                ),
+                shape = shape
+            )
+            .border(
+                width = 1.dp,
+                color = if (isActive) Cyan.copy(alpha = 0.72f) else GlassBorder,
+                shape = shape
+            )
+            .clickable(onClick = onOpen)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = session.title,
+                color = TextPrimary,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Text(
+                text = session.preview.ifBlank { "UCF conversation" },
+                color = TextSecondary,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Text(
+                text = "${session.fromModel} → ${session.toModel} • ${formatUcfTimestamp(session.updatedAtMillis)}",
+                color = TextMuted,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1
+            )
+        }
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        Text(
+            text = "Open",
+            color = Cyan,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier
+                .clickable(onClick = onOpen)
+                .padding(6.dp)
+        )
+
+        Text(
+            text = "Delete",
+            color = TextMuted,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier
+                .clickable(onClick = onDelete)
+                .padding(6.dp)
+        )
+    }
+}
+
+@Composable
+private fun AnswersConversationPanel(
+    state: CockpitUiState,
+    expandedEntries: MutableMap<String, Boolean>,
+    onDismissError: () -> Unit
+) {
+    GlassCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 240.dp)
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = "Answers & Conversation",
+                color = TextPrimary,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Text(
+                text = "Your questions and model answers will appear here clearly.",
+                color = TextSecondary,
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            AnimatedVisibility(
+                visible = state.errorMessage != null
+            ) {
+                PremiumErrorCard(
+                    title = "UCF operation interrupted",
+                    message = state.errorMessage.orEmpty(),
+                    dismissLabel = "Dismiss",
+                    onDismiss = onDismissError
+                )
+            }
+
+            if (state.consoleEntries.isEmpty()) {
+                Text(
+                    text = "No conversation yet.",
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Text(
+                    text = "Use the Search / Chat box above to ask your first question.",
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            } else {
+                state.consoleEntries.forEach { entry ->
+                    ConversationEntryCard(
+                        entry = entry,
+                        expanded = expandedEntries[entry.id] == true,
+                        onToggleProof = {
+                            expandedEntries[entry.id] = expandedEntries[entry.id] != true
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConversationEntryCard(
+    entry: CockpitConsoleEntry,
+    expanded: Boolean,
+    onToggleProof: () -> Unit
+) {
+    val isUser = entry.kind == "user"
+    val isSystem = entry.kind == "system"
+
+    val shape = RoundedCornerShape(22.dp)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                color = when {
+                    isUser -> MidnightSurfaceHigh.copy(alpha = 0.70f)
+                    isSystem -> MidnightSurfaceHigh.copy(alpha = 0.58f)
+                    else -> GlassSurface.copy(alpha = 0.88f)
+                },
+                shape = shape
+            )
+            .border(
+                width = 1.dp,
+                color = when {
+                    isUser -> Cyan.copy(alpha = 0.55f)
+                    isSystem -> Violet.copy(alpha = 0.45f)
+                    else -> Cyan.copy(alpha = 0.25f)
+                },
+                shape = shape
+            )
+            .padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            text = if (isUser) "Your Question" else "Answer / Result",
+            color = if (isUser) Cyan else TextPrimary,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold
+        )
+
+        Text(
+            text = entry.title,
+            color = TextPrimary,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+
+        Text(
+            text = entry.content,
+            color = if (isUser) TextSecondary else TextPrimary,
+            style = if (isUser) {
+                MaterialTheme.typography.bodyLarge
+            } else {
+                MaterialTheme.typography.bodyLarge
+            }
+        )
+
+        entry.technicalProof?.let {
+            Text(
+                text = if (expanded) {
+                    "Hide technical details"
+                } else {
+                    "Show technical details"
+                },
+                color = Cyan,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickable(onClick = onToggleProof)
+            )
+
+            AnimatedVisibility(visible = expanded) {
+                Text(
+                    text = it,
+                    color = TextMuted,
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
         }
@@ -357,9 +647,7 @@ private fun WebsiteModelDropdown(
             style = MaterialTheme.typography.labelLarge
         )
 
-        Box(
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -372,9 +660,7 @@ private fun WebsiteModelDropdown(
                         color = if (expanded) Cyan else GlassBorder,
                         shape = RoundedCornerShape(SECVergeDimens.RadiusSmall)
                     )
-                    .clickable(enabled = enabled) {
-                        expanded = true
-                    }
+                    .clickable(enabled = enabled) { expanded = true }
                     .padding(horizontal = 14.dp, vertical = 13.dp)
             ) {
                 Row(
@@ -398,8 +684,7 @@ private fun WebsiteModelDropdown(
 
             DropdownMenu(
                 expanded = expanded,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier.background(GlassSurface)
+                onDismissRequest = { expanded = false }
             ) {
                 options.forEach { option ->
                     val disabled = disabledOptions.contains(option)
@@ -408,11 +693,7 @@ private fun WebsiteModelDropdown(
                         enabled = enabled && !disabled,
                         text = {
                             Text(
-                                text = if (disabled) {
-                                    "$option · selected"
-                                } else {
-                                    option
-                                },
+                                text = if (disabled) "$option · selected" else option,
                                 color = if (disabled) TextMuted else TextPrimary,
                                 style = MaterialTheme.typography.bodyMedium
                             )
@@ -429,29 +710,16 @@ private fun WebsiteModelDropdown(
 }
 
 @Composable
-private fun CockpitPromptField(
+private fun UcfPromptField(
     value: String,
     enabled: Boolean,
     onValueChange: (String) -> Unit
 ) {
-    val bringIntoViewRequester = remember { BringIntoViewRequester() }
-    val coroutineScope = rememberCoroutineScope()
-
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
         enabled = enabled,
-        modifier = Modifier
-            .fillMaxWidth()
-            .bringIntoViewRequester(bringIntoViewRequester)
-            .onFocusEvent { focusState ->
-                if (focusState.isFocused) {
-                    coroutineScope.launch {
-                        delay(250)
-                        bringIntoViewRequester.bringIntoView()
-                    }
-                }
-            },
+        modifier = Modifier.fillMaxWidth(),
         textStyle = MaterialTheme.typography.bodyLarge.copy(
             color = TextPrimary
         ),
@@ -460,21 +728,21 @@ private fun CockpitPromptField(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 88.dp)
+                    .heightIn(min = 84.dp)
                     .background(
-                        color = GlassSurface.copy(alpha = 0.78f),
+                        color = GlassSurface.copy(alpha = 0.82f),
                         shape = RoundedCornerShape(SECVergeDimens.RadiusMedium)
                     )
                     .border(
-                        width = 1.dp,
-                        color = GlassBorder,
+                        width = 1.5.dp,
+                        color = Cyan.copy(alpha = 0.72f),
                         shape = RoundedCornerShape(SECVergeDimens.RadiusMedium)
                     )
                     .padding(18.dp)
             ) {
                 if (value.isEmpty()) {
                     Text(
-                        text = "Ask SECVerge AI anything...",
+                        text = "Search here or chat here…",
                         color = TextMuted,
                         style = MaterialTheme.typography.bodyLarge
                     )
@@ -505,16 +773,16 @@ private fun WebsitePrimaryButton(
                 color = if (enabled) Cyan.copy(alpha = 0.35f) else GlassBorder,
                 shape = RoundedCornerShape(SECVergeDimens.RadiusMedium)
             )
-            .clickable(enabled = enabled) {
-                onClick()
-            }
+            .clickable(enabled = enabled) { onClick() }
             .padding(horizontal = 10.dp, vertical = 14.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = text,
             color = if (enabled) TextPrimary else TextMuted,
-            style = MaterialTheme.typography.labelLarge
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -538,175 +806,25 @@ private fun WebsiteSecondaryButton(
                 color = GlassBorder,
                 shape = RoundedCornerShape(SECVergeDimens.RadiusMedium)
             )
-            .clickable(enabled = enabled) {
-                onClick()
-            }
+            .clickable(enabled = enabled) { onClick() }
             .padding(horizontal = 10.dp, vertical = 13.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = text,
             color = if (enabled) TextPrimary else TextMuted,
-            style = MaterialTheme.typography.labelLarge
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
 
-private fun createUcfPdf(
-    context: Context,
-    state: CockpitUiState
+private fun formatUcfTimestamp(
+    updatedAtMillis: Long
 ): String {
-    val fileName = "SECVerge_UCF_" +
-        SimpleDateFormat(
-            "yyyyMMdd_HHmmss",
-            Locale.US
-        ).format(Date()) +
-        ".pdf"
-
-    val document = PdfDocument()
-    val titlePaint = Paint().apply {
-        color = Color.rgb(12, 18, 32)
-        textSize = 18f
-        isFakeBoldText = true
-    }
-    val labelPaint = Paint().apply {
-        color = Color.rgb(35, 60, 100)
-        textSize = 12f
-        isFakeBoldText = true
-    }
-    val bodyPaint = Paint().apply {
-        color = Color.rgb(40, 46, 62)
-        textSize = 11f
-    }
-
-    var pageNumber = 1
-    var y = 48f
-    var page = document.startPage(
-        PdfDocument.PageInfo.Builder(
-            595,
-            842,
-            pageNumber
-        ).create()
-    )
-    var canvas = page.canvas
-    canvas.drawColor(Color.WHITE)
-
-    fun newPage() {
-        document.finishPage(page)
-        pageNumber += 1
-        y = 48f
-        page = document.startPage(
-            PdfDocument.PageInfo.Builder(
-                595,
-                842,
-                pageNumber
-            ).create()
-        )
-        canvas = page.canvas
-        canvas.drawColor(Color.WHITE)
-    }
-
-    fun drawLine(
-        text: String,
-        paint: Paint = bodyPaint,
-        extra: Float = 18f
-    ) {
-        if (y > 790f) {
-            newPage()
-        }
-        canvas.drawText(text, 42f, y, paint)
-        y += extra
-    }
-
-    fun drawWrapped(
-        text: String,
-        paint: Paint = bodyPaint
-    ) {
-        text.lines().forEach { paragraph ->
-            if (paragraph.isBlank()) {
-                y += 10f
-            } else {
-                var line = ""
-                paragraph.split(" ").forEach { word ->
-                    val candidate = if (line.isBlank()) word else "$line $word"
-                    if (paint.measureText(candidate) > 505f) {
-                        drawLine(line, paint)
-                        line = word
-                    } else {
-                        line = candidate
-                    }
-                }
-                if (line.isNotBlank()) {
-                    drawLine(line, paint)
-                }
-            }
-        }
-    }
-
-    drawLine("SECVerge AI — Unified Context Cockpit", titlePaint, 26f)
-    drawLine("Responding Model: ${state.fromModel}", labelPaint)
-    drawLine("Switch Target: ${state.toModel}", labelPaint)
-    y += 8f
-
-    drawLine("Current Prompt", labelPaint)
-    drawWrapped(
-        state.prompt.ifBlank {
-            "No active prompt entered."
-        }
-    )
-    y += 12f
-
-    drawLine("Conversation History", labelPaint)
-
-    if (state.consoleEntries.isEmpty()) {
-        drawWrapped("No conversation history yet.")
-    } else {
-        state.consoleEntries.forEachIndexed { index, entry ->
-            y += 8f
-            drawLine("${index + 1}. ${entry.title}", labelPaint)
-            drawWrapped(entry.content)
-        }
-    }
-
-    document.finishPage(page)
-
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        val values = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-            put(MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
-            put(
-                MediaStore.MediaColumns.RELATIVE_PATH,
-                Environment.DIRECTORY_DOWNLOADS + "/SECVergeAI"
-            )
-        }
-
-        val uri = context.contentResolver.insert(
-            MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-            values
-        ) ?: error("Unable to create PDF file.")
-
-        context.contentResolver.openOutputStream(uri)?.use { output ->
-            document.writeTo(output)
-        } ?: error("Unable to write PDF file.")
-
-        document.close()
-
-        return "PDF saved to Downloads/SECVergeAI/$fileName"
-    } else {
-        val dir = File(
-            context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
-            "SECVergeAI"
-        )
-        dir.mkdirs()
-
-        val file = File(dir, fileName)
-
-        file.outputStream().use { output ->
-            document.writeTo(output)
-        }
-
-        document.close()
-
-        return "PDF saved to ${file.absolutePath}"
-    }
+    return DateFormat.format(
+        "dd MMM, h:mm a",
+        updatedAtMillis
+    ).toString()
 }

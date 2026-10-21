@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class AskRequest(
     val prompt: String,
+    val message: String? = prompt,
     @SerialName("conversation_id") val conversationId: String? = null
 )
 

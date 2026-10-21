@@ -5,10 +5,26 @@ import com.secverge.ai.data.models.cockpit.ExecuteRequest
 import com.secverge.ai.data.models.cockpit.RouteRequest
 import com.secverge.ai.data.models.cockpit.SwitchRequest
 import com.secverge.ai.data.network.SECVergeApi
+import com.secverge.ai.ui.askhachy.AskHachyRepository
 
 class CockpitRepository(
     private val api: SECVergeApi
 ) {
+    private val askHachyRepository =
+        AskHachyRepository(api = api)
+
+    suspend fun askHachyDirect(
+        prompt: String,
+        conversationId: String? = null
+    ) = askHachyRepository.ask(
+        prompt = prompt,
+        conversationId = conversationId
+    )
+
+    suspend fun adapterStatus() = runCatching {
+        api.adapterStatus()
+    }
+
     suspend fun buildContext(
         prompt: String,
         fromModel: String
@@ -34,6 +50,7 @@ class CockpitRepository(
                 prompt = prompt,
                 taskType = taskType,
                 privacy = privacy,
+                privacyMode = privacy,
                 fromModel = fromModel,
                 toModel = toModel
             )
@@ -49,7 +66,8 @@ class CockpitRepository(
             SwitchRequest(
                 snapshotId = snapshotId,
                 fromModel = fromModel,
-                toModel = toModel
+                toModel = toModel,
+                preserveContext = true
             )
         )
     }
@@ -57,11 +75,15 @@ class CockpitRepository(
     suspend fun execute(
         switchId: String?,
         prompt: String,
-        model: String
+        model: String,
+        snapshotId: String? = null,
+        routeId: String? = null
     ) = runCatching {
         api.execute(
             ExecuteRequest(
                 switchId = switchId,
+                snapshotId = snapshotId,
+                routeId = routeId,
                 prompt = prompt,
                 model = model
             )

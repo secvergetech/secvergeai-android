@@ -4,7 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 
 class AskHachyViewModelFactory(
-    private val repository: AskHachyRepository
+    private val repository: AskHachyRepository,
+    private val historyStore: AskHachyHistoryStore
 ) : ViewModelProvider.Factory {
 
     @Suppress("UNCHECKED_CAST")
@@ -12,7 +13,10 @@ class AskHachyViewModelFactory(
         modelClass: Class<T>
     ): T {
         if (modelClass.isAssignableFrom(AskHachyViewModel::class.java)) {
-            return AskHachyViewModel(repository) as T
+            return AskHachyViewModel(
+                repository = repository,
+                historyStore = historyStore
+            ) as T
         }
 
         throw IllegalArgumentException(

@@ -14,9 +14,11 @@ import com.secverge.ai.data.auth.AuthDependencies
 import com.secverge.ai.ui.cockpit.CockpitViewModelFactory
 import com.secverge.ai.ui.cockpit.CockpitViewModel
 import com.secverge.ai.ui.cockpit.CockpitRepository
+import com.secverge.ai.ui.cockpit.CockpitSessionStore
 import com.secverge.ai.ui.askhachy.AskHachyViewModelFactory
 import com.secverge.ai.ui.askhachy.AskHachyViewModel
 import com.secverge.ai.ui.askhachy.AskHachyRepository
+import com.secverge.ai.ui.askhachy.AskHachyHistoryStore
 import com.secverge.ai.data.features.FeatureDependencies
 import com.secverge.ai.ui.askhachy.AskHachyScreen
 import com.secverge.ai.ui.cockpit.CockpitScreen
@@ -176,10 +178,15 @@ private fun SECVergeNavHost(
         }
 
         composable(SECVergeRoute.AskHachy.route) {
+            val askContext = LocalContext.current
+
             val askHachyViewModel: AskHachyViewModel = viewModel(
                 factory = AskHachyViewModelFactory(
                     repository = AskHachyRepository(
                         api = featureDependencies.api
+                    ),
+                    historyStore = AskHachyHistoryStore(
+                        askContext.applicationContext
                     )
                 )
             )
@@ -190,10 +197,15 @@ private fun SECVergeNavHost(
         }
 
         composable(SECVergeRoute.Cockpit.route) {
+            val cockpitContext = LocalContext.current
+
             val cockpitViewModel: CockpitViewModel = viewModel(
                 factory = CockpitViewModelFactory(
                     repository = CockpitRepository(
                         api = featureDependencies.api
+                    ),
+                    sessionStore = CockpitSessionStore(
+                        cockpitContext.applicationContext
                     )
                 )
             )
