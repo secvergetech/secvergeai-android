@@ -173,19 +173,11 @@ class CockpitViewModel(
         persistActiveSession()
 
         viewModelScope.launch {
-            if (isAskHachyDisplayModel(state.fromModel)) {
-                sendDirectToAskHachy(
-                    cleanPrompt = cleanPrompt,
-                    displayModel = state.fromModel
-                )
-                return@launch
-            }
-
             val directPrompt = buildDirectAnswerPrompt(
                 question = cleanPrompt
             )
 
-            executeWithModelFallback(
+            executeSelectedModel(
                 switchId = state.switchId,
                 snapshotId = state.snapshotId,
                 routeId = null,
@@ -203,12 +195,12 @@ class CockpitViewModel(
                     title = state.fromModel,
                     content = output,
                     technicalProof = buildString {
-                        appendLine("Endpoint: /api/v1/multillm/execute")
+                        appendLine("Endpoint: /api/v1/multillm/stream")
                         appendLine("Display model: ${state.fromModel}")
-                        appendLine("Used backend alias: $usedBackendModel")
+                        appendLine("Verified backend model: $usedBackendModel")
                         appendLine("Direct current-question prompt: yes")
-                        appendLine("Switch ID: ${state.switchId ?: "none"}")
-                        appendLine("Snapshot ID: ${state.snapshotId ?: "none"}")
+                        appendLine("Saved UCF switch: ${state.switchId ?: "none"}")
+                        appendLine("Saved UCF snapshot: ${state.snapshotId ?: "none"}")
                         appendLine("Prompt cleared after successful send: yes")
                     }
                 )
@@ -240,161 +232,6 @@ class CockpitViewModel(
             }
         }
     }
-
-    private suspend fun sendDirectToAskHachy(
-        cleanPrompt: String,
-        displayModel: String
-    ) {
-        val strictPrompt = buildDirectAnswerPrompt(
-            question = cleanPrompt
-        )
-
-        repository.askHachyDirect(
-            prompt = strictPrompt,
-            conversationId = null
-        ).onSuccess { result ->
-            val directAnswer = result.answer.trim()
-
-            if (
-                directAnswer.isNotBlank() &&
-                !isStaleHistoryRefusal(directAnswer)
-            ) {
-                val assistantEntry = CockpitConsoleEntry(
-                    title = displayModel,
-                    content = directAnswer,
-                    technicalProof = buildString {
-                        appendLine("Endpoint: /api/v1/ask")
-                        appendLine("Reason: Ask Hachy / Gemma direct answer")
-                        appendLine("UCF execute bypassed: yes")
-                        appendLine("Fallback needed: no")
-                        appendLine("Old UCF context ignored for normal Get Answer: yes")
-                        appendLine("Prompt cleared after successful send: yes")
-                        appendLine("Conversation ID: ${result.conversationId ?: "not returned"}")
-                    }
-                )
-
-                _uiState.update { current ->
-                    current.copy(
-                        prompt = "",
-                        isLoading = false,
-                        activeAction = null,
-                        errorMessage = null,
-                        consoleEntries =
-                            current.consoleEntries +
-                                assistantEntry
-                    )
-                }
-
-                persistActiveSession()
-                return
-            }
-        }
-
-        // If /api/v1/ask fails OR gives stale old-history answer,
-        // immediately fall back to /api/v1/multillm/execute.
-        executeWithModelFallback(
-            switchId = null,
-            snapshotId = null,
-            routeId = null,
-            prompt = strictPrompt,
-            displayModel = displayModel,
-            preferredBackendModel = toBackendModel(displayModel)
-        ).onSuccess { executionPair ->
-            val response = executionPair.first
-            val usedBackendModel = executionPair.second
-
-            val output = response.bestText()
-                ?.trim()
-                ?.takeIf { it.isNotBlank() }
-                ?.takeIf { !isStaleHistoryRefusal(it) }
-
-            val finalAnswer = output ?: buildBackendFallbackExplanation(
-                question = cleanPrompt,
-                displayModel = displayModel
-            )
-
-            val assistantEntry = CockpitConsoleEntry(
-                title = displayModel,
-                content = finalAnswer,
-                technicalProof = buildString {
-                    appendLine("Primary endpoint attempted: /api/v1/ask")
-                    appendLine("Primary endpoint result: failed or stale")
-                    appendLine("Fallback endpoint: /api/v1/multillm/execute")
-                    appendLine("Used backend alias: $usedBackendModel")
-                    appendLine("Standalone current-question mode: yes")
-                    appendLine("Old conversation-history refusal filtered: yes")
-                    appendLine("Prompt cleared after answer: yes")
-                    appendLine("Conversation preserved: yes")
-                }
-            )
-
-            _uiState.update { current ->
-                current.copy(
-                    prompt = "",
-                    isLoading = false,
-                    activeAction = null,
-                    errorMessage = null,
-                    consoleEntries =
-                        current.consoleEntries +
-                            assistantEntry
-                )
-            }
-
-            persistActiveSession()
-        }.onFailure { throwable ->
-            val assistantEntry = CockpitConsoleEntry(
-                title = "Ask Hachy / Gemma connection issue",
-                content = buildString {
-                    appendLine("I could not get a live answer from the current backend for this question.")
-                    appendLine()
-                    appendLine("Your question:")
-                    appendLine(cleanPrompt)
-                    appendLine()
-                    appendLine("What happened:")
-                    appendLine("- The direct Ask Hachy endpoint failed.")
-                    appendLine("- The UCF execute fallback also failed.")
-                    appendLine("- The app did not crash and your conversation was preserved.")
-                    appendLine()
-                    appendLine("This is now shown as a normal conversation result instead of a red dead-end error.")
-                },
-                technicalProof = buildString {
-                    appendLine("Primary endpoint: /api/v1/ask")
-                    appendLine("Fallback endpoint: /api/v1/multillm/execute")
-                    appendLine("Display model: $displayModel")
-                    appendLine("Attempted aliases:")
-                    backendModelAliases(
-                        displayModel = displayModel,
-                        preferredBackendModel = toBackendModel(displayModel)
-                    ).forEach {
-                        appendLine("- $it")
-                    }
-                    appendLine()
-                    appendLine("Backend error:")
-                    appendLine(throwable.message ?: "No backend detail returned.")
-                    appendLine()
-                    appendLine("Prompt cleared: yes")
-                    appendLine("Conversation preserved: yes")
-                    appendLine("Backend/web/database unchanged: yes")
-                },
-                kind = "system"
-            )
-
-            _uiState.update { current ->
-                current.copy(
-                    prompt = "",
-                    isLoading = false,
-                    activeAction = null,
-                    errorMessage = null,
-                    consoleEntries =
-                        current.consoleEntries +
-                            assistantEntry
-                )
-            }
-
-            persistActiveSession()
-        }
-    }
-
 
     fun switchAndCarry() {
         val state = _uiState.value
@@ -496,7 +333,7 @@ class CockpitViewModel(
                 typedPrompt = typedPrompt
             )
 
-            executeWithModelFallback(
+            executeSelectedModel(
                 switchId = switchId,
                 snapshotId = snapshotId,
                 routeId = route?.bestRouteId(),
@@ -515,15 +352,15 @@ class CockpitViewModel(
                     title = "UCF carried: $sourceDisplay → $targetDisplay",
                     content = output,
                     technicalProof = buildString {
-                        appendLine("Endpoint chain:")
+                        appendLine("Context snapshot/switch retained; visible transcript sent to provider:")
                         appendLine("1. /api/v1/multillm/context/snapshot")
                         appendLine("2. /api/v1/multillm/route")
                         appendLine("3. /api/v1/multillm/switch")
-                        appendLine("4. /api/v1/multillm/execute")
+                        appendLine("4. /api/v1/multillm/stream")
                         appendLine("")
                         appendLine("From model: $sourceModel")
                         appendLine("To model: $targetModel")
-                        appendLine("Used backend alias: $usedBackendModel")
+                        appendLine("Verified backend model: $usedBackendModel")
                         appendLine("Snapshot ID: $snapshotId")
                         appendLine("Route ID: ${route?.bestRouteId() ?: "not returned"}")
                         appendLine("Switch ID: ${switchId ?: "not returned"}")
@@ -589,7 +426,7 @@ class CockpitViewModel(
             typedPrompt = typedPrompt
         )
 
-        executeWithModelFallback(
+        executeSelectedModel(
             switchId = null,
             snapshotId = null,
             routeId = null,
@@ -607,15 +444,15 @@ class CockpitViewModel(
                 title = "UCF carried: $sourceDisplay → $targetDisplay",
                 content = output,
                 technicalProof = buildString {
-                    appendLine("Endpoint chain:")
+                    appendLine("Context snapshot/switch retained; visible transcript sent to provider:")
                     appendLine("1. /api/v1/multillm/context/snapshot returned no usable snapshot_id")
                     appendLine("2. Android used visible conversation as carried context")
-                    appendLine("3. /api/v1/multillm/execute called target model directly")
+                    appendLine("3. /api/v1/multillm/stream called target model directly")
                     appendLine("")
                     appendLine("From model: $sourceDisplay")
                     appendLine("To model: $targetDisplay")
                     appendLine("Backend target model: $targetModel")
-                    appendLine("Used backend alias: $usedBackendModel")
+                    appendLine("Verified backend model: $usedBackendModel")
                     appendLine("Snapshot ID: fallback-not-returned")
                     appendLine("Switch ID: fallback-not-required")
                     appendLine("Prompt cleared after switch: yes")
@@ -816,7 +653,7 @@ class CockpitViewModel(
         }
     }
 
-    private suspend fun executeWithModelFallback(
+    private suspend fun executeSelectedModel(
         switchId: String?,
         snapshotId: String?,
         routeId: String?,
@@ -826,10 +663,8 @@ class CockpitViewModel(
     ): Result<Pair<ExecuteResponse, String>> {
         var lastFailure: Throwable? = null
 
-        val aliases = backendModelAliases(
-            displayModel = displayModel,
-            preferredBackendModel = preferredBackendModel
-        )
+        // Never silently substitute another model for an explicit selection.
+        val aliases = listOf(preferredBackendModel)
 
         for (alias in aliases) {
             val result = repository.execute(
@@ -844,12 +679,14 @@ class CockpitViewModel(
                 val response = result.getOrThrow()
                 val readable = response.bestText()
 
-                if (!readable.isNullOrBlank()) {
+                if (response.ok && !readable.isNullOrBlank() &&
+                    response.execution?.selectedModel == alias
+                ) {
                     return Result.success(response to alias)
                 }
 
                 lastFailure = IllegalStateException(
-                    "Backend returned empty response for alias: $alias"
+                    "Selected model $alias returned no verified answer (reported model: ${response.execution?.selectedModel ?: "missing"})."
                 )
             } else {
                 lastFailure = result.exceptionOrNull()
@@ -874,9 +711,8 @@ class CockpitViewModel(
             content = buildString {
                 appendLine("$targetDisplay did not return a usable answer from the current SECVerge backend.")
                 appendLine()
-                appendLine("Ask Hachy / Gemma direct answering is fixed separately and should work through /api/v1/ask.")
-                appendLine()
-                appendLine("This selected target model may be unavailable, unconfigured, or mapped differently on backend.")
+                appendLine(friendlyError(throwable ?: IllegalStateException("Empty model response")))
+                appendLine("No response from a different model was substituted.")
             },
             technicalProof = buildString {
                 appendLine("UCF target execution failed cleanly.")
@@ -912,56 +748,7 @@ class CockpitViewModel(
         persistActiveSession()
     }
 
-    private fun buildDirectAnswerPrompt(
-        question: String
-    ): String {
-        return buildString {
-            appendLine("You are Ask Hachy inside SECVerge AI.")
-            appendLine("Answer the user's CURRENT question directly and helpfully.")
-            appendLine("Treat this as a brand-new standalone question.")
-            appendLine("Ignore any old conversation history unless the current question explicitly asks about earlier messages.")
-            appendLine("Do not say: previous conversation, conversation history, not enough context, or clarify, when the question is generally answerable.")
-            appendLine("If the user asks to explain a concept, give a clear simple explanation.")
-            appendLine()
-            appendLine("CURRENT QUESTION:")
-            appendLine(question)
-        }
-    }
-
-    private fun isStaleHistoryRefusal(
-        answer: String
-    ): Boolean {
-        val normalized = answer.lowercase(Locale.US)
-
-        return (
-            normalized.contains("previous conversation") ||
-                normalized.contains("conversation history") ||
-                normalized.contains("discussing history") ||
-                normalized.contains("haven't covered") ||
-                normalized.contains("hasn't covered") ||
-                normalized.contains("doesn't include") ||
-                normalized.contains("does not include") ||
-                normalized.contains("not enough information") ||
-                normalized.contains("provide more context") ||
-                normalized.contains("clarify what")
-            )
-    }
-
-    private fun buildBackendFallbackExplanation(
-        question: String,
-        displayModel: String
-    ): String {
-        return buildString {
-            appendLine("$displayModel could not return a clean live answer from backend for this question.")
-            appendLine()
-            appendLine("Question:")
-            appendLine(question)
-            appendLine()
-            appendLine("The app filtered a stale old-history style response and preserved the conversation.")
-            appendLine("Please retry once. If this repeats, the backend model response contract needs repair.")
-        }
-    }
-
+    private fun buildDirectAnswerPrompt(question: String): String = question
 
     private fun buildCarryPrompt(
         sourceDisplay: String,
@@ -1077,106 +864,10 @@ class CockpitViewModel(
         }
     }
 
-    private fun isAskHachyDisplayModel(
-        displayModel: String
-    ): Boolean {
-        val normalized = displayModel
-            .lowercase(Locale.US)
-
-        return normalized.contains("hachy") ||
-            normalized.contains("gemma")
-    }
-
     private fun backendModelAliases(
         displayModel: String,
         preferredBackendModel: String
-    ): List<String> {
-        val normalized = displayModel
-            .trim()
-            .lowercase(Locale.US)
-
-        val aliases = when {
-            normalized.contains("hachy") ||
-                normalized.contains("gemma") -> listOf(
-                    preferredBackendModel,
-                    "Ask Hachy",
-                    "ask_hachy",
-                    "ask-hachy",
-                    "hachy",
-                    "gemma",
-                    "gemma3",
-                    "gemma-3"
-                )
-
-            normalized.contains("llama") -> listOf(
-                preferredBackendModel,
-                "llama",
-                "Llama",
-                "llama3",
-                "llama-3",
-                "llama3:latest",
-                "meta-llama",
-                "meta_llama"
-            )
-
-            normalized.contains("mistral") -> listOf(
-                preferredBackendModel,
-                "mistral",
-                "Mistral",
-                "mistral:latest"
-            )
-
-            normalized.contains("qwen") -> listOf(
-                preferredBackendModel,
-                "qwen",
-                "Qwen",
-                "qwen2",
-                "qwen2.5",
-                "qwen:latest"
-            )
-
-            normalized.contains("claude") -> listOf(
-                preferredBackendModel,
-                "claude",
-                "Claude",
-                "anthropic",
-                "claude-3",
-                "claude-3-5-sonnet"
-            )
-
-            normalized.contains("gemini") -> listOf(
-                preferredBackendModel,
-                "gemini",
-                "Gemini",
-                "google",
-                "gemini-pro",
-                "gemini-1.5-pro"
-            )
-
-            normalized.contains("gpt") ||
-                normalized.contains("openai") ||
-                normalized.contains("chatgpt") -> listOf(
-                    preferredBackendModel,
-                    "gpt",
-                    "GPT",
-                    "openai",
-                    "chatgpt",
-                    "gpt-4",
-                    "gpt-4o"
-                )
-
-            else -> listOf(
-                preferredBackendModel,
-                displayModel,
-                displayModel.lowercase(Locale.US)
-            )
-        }
-
-        return aliases
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-            .distinct()
-    }
+    ): List<String> = listOf(preferredBackendModel)
 
     private fun fallbackModel(
         excluding: String,
@@ -1190,10 +881,10 @@ class CockpitViewModel(
 
     private fun toBackendModel(displayModel: String): String {
         return when (displayModel) {
-            "Ask Hachy / Gemma" -> "Ask Hachy"
-            "Llama" -> "llama"
-            "Mistral" -> "mistral"
-            "Qwen" -> "qwen"
+            "Ask Hachy / Gemma" -> "gemma3:4b-it-q8_0"
+            "Llama" -> "llama3.2:3b"
+            "Mistral" -> "mistral:latest"
+            "Qwen" -> "qwen2.5:7b"
             "Claude" -> "claude"
             "Gemini" -> "gemini"
             "GPT" -> "gpt"
@@ -1206,6 +897,7 @@ class CockpitViewModel(
     }
 
     private fun ExecuteResponse.bestText(): String? {
+        execution?.response?.takeIf { it.isNotBlank() }?.let { return it }
         return listOf(
             output,
             response,
@@ -1220,6 +912,7 @@ class CockpitViewModel(
 
     private fun ContextSnapshotResponse.bestSnapshotId(): String? {
         return listOf(
+            snapshot?.snapshotId,
             snapshotId,
             contextSnapshotId,
             id
@@ -1237,15 +930,16 @@ class CockpitViewModel(
     }
 
     private fun SwitchResponse.bestSwitchId(): String? {
-        return switchId ?: id
+        return switch?.switchId ?: switchId ?: id
     }
 
     private fun SwitchResponse.bestFidelity(): Double? {
-        return fidelityScore ?: contextFidelity
+        return switch?.contextFidelity ?: fidelityScore ?: contextFidelity
     }
 
     private fun SwitchResponse.bestCarriedContext(): String? {
         return listOf(
+            switch?.message,
             carriedContext,
             context,
             summary,
@@ -1299,6 +993,9 @@ class CockpitViewModel(
 
             raw.contains("401") ->
                 "Your session has expired. Please log in again."
+
+            raw.contains("500") || raw.contains("502") || raw.contains("503") ->
+                "The server returned an error for the selected model ($raw). Please retry later."
 
             raw.contains("404") ->
                 "The expected endpoint is not available yet."

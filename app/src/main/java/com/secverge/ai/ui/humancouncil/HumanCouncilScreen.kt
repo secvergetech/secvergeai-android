@@ -64,71 +64,21 @@ import java.util.Locale
 fun HumanCouncilScreen(
     viewModel: HumanCouncilViewModel
 ) {
-    val state by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
-
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MidnightCanvas)
-            .imePadding()
-            .navigationBarsPadding()
-            .verticalScroll(rememberScrollState())
+        modifier = Modifier.fillMaxSize().background(MidnightCanvas)
             .padding(SECVergeDimens.Space3),
         verticalArrangement = Arrangement.spacedBy(SECVergeDimens.Space3)
     ) {
-        PremiumTopBar(
-            subtitle = "Multi-LLM + Human · You are the Gatekeeper"
+        PremiumTopBar(subtitle = "Multi-LLM + Human")
+        Text(
+            text = "Human Council is currently unavailable",
+            color = TextPrimary,
+            style = MaterialTheme.typography.titleLarge
         )
-
-        HumanHeroCard()
-
-        HumanStepRail(state.stage)
-
-        HumanControlPanel(
-            state = state,
-            onObjectiveChange = viewModel::updateObjective,
-            onInstructionChange = viewModel::updateInstruction,
-            onToggleParticipant = viewModel::toggleParticipant,
-            onDirectModel = viewModel::setDirectModel,
-            onTestRuntime = viewModel::testRuntime,
-            onStartRoom = viewModel::startRoom,
-            onAskModels = viewModel::askModels,
-            onDirect = viewModel::directModel,
-            onMemo = viewModel::buildDecisionMemo,
-            onExportPdf = {
-                val result = runCatching {
-                    exportHumanPdf(
-                        context = context,
-                        state = state
-                    )
-                }.fold(
-                    onSuccess = { it },
-                    onFailure = {
-                        "PDF export failed: ${it.message ?: "Unknown error"}"
-                    }
-                )
-
-                viewModel.markPdfExported(result)
-
-                Toast.makeText(
-                    context,
-                    result,
-                    Toast.LENGTH_LONG
-                ).show()
-            }
+        Text(
+            text = "The public Human Council API returns HTTP 404. Live model collaboration is unavailable here. Try Ask Hachy, AI Council, or Delphi.",
+            color = TextSecondary
         )
-
-        HumanWorkspace(state)
-
-        state.errorMessage?.let { message ->
-            PremiumErrorCard(
-                title = "Human decision room interrupted",
-                message = message,
-                dismissLabel = "Dismiss",
-                onDismiss = viewModel::dismissError
-            )
-        }
     }
 }
 

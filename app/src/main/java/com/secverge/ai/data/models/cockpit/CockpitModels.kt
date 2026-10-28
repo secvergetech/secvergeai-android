@@ -9,12 +9,13 @@ import kotlinx.serialization.json.JsonObject
 data class ContextSnapshotRequest(
     @SerialName("conversation_id") val conversationId: String? = null,
     val prompt: String,
-    @SerialName("from_model") val fromModel: String,
+    @SerialName("current_model") val fromModel: String,
     val messages: List<String>? = null
 )
 
 @Serializable
 data class ContextSnapshotResponse(
+    val snapshot: ContextSnapshotPayload? = null,
     @SerialName("snapshot_id") val snapshotId: String? = null,
     @SerialName("context_snapshot_id") val contextSnapshotId: String? = null,
     val id: String? = null,
@@ -55,6 +56,7 @@ data class SwitchRequest(
 
 @Serializable
 data class SwitchResponse(
+    val switch: SwitchPayload? = null,
     @SerialName("switch_id") val switchId: String? = null,
     val id: String? = null,
     @SerialName("carried_context") val carriedContext: String? = null,
@@ -73,11 +75,14 @@ data class ExecuteRequest(
     @SerialName("snapshot_id") val snapshotId: String? = null,
     @SerialName("route_id") val routeId: String? = null,
     val prompt: String,
-    val model: String
+    val model: String,
+    @SerialName("force_model") val forceModel: String = model
 )
 
 @Serializable
 data class ExecuteResponse(
+    val ok: Boolean = true,
+    val execution: ExecutionPayload? = null,
     val output: JsonElement? = null,
     val response: JsonElement? = null,
     val answer: JsonElement? = null,
@@ -101,4 +106,29 @@ data class AdapterStatusDto(
     @SerialName("display_name") val displayName: String? = null,
     val status: String = "unknown",
     val configured: Boolean = false
+)
+
+@Serializable
+data class ExecutionPayload(
+    val response: String? = null,
+    @SerialName("selected_model") val selectedModel: String? = null
+)
+
+@Serializable
+data class ContextSnapshotPayload(
+    @SerialName("snapshot_id") val snapshotId: String,
+    @SerialName("current_model") val currentModel: String? = null
+)
+
+@Serializable
+data class SwitchPayload(
+    @SerialName("switch_id") val switchId: String,
+    @SerialName("context_fidelity") val contextFidelity: Double? = null,
+    val message: String? = null
+)
+
+@Serializable
+data class ProviderStreamRequest(
+    val prompt: String,
+    @SerialName("target_model") val targetModel: String
 )

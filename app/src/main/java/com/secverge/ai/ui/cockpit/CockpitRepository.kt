@@ -1,7 +1,12 @@
 package com.secverge.ai.ui.cockpit
 
 import com.secverge.ai.data.models.cockpit.ContextSnapshotRequest
-import com.secverge.ai.data.models.cockpit.ExecuteRequest
+import com.secverge.ai.data.models.cockpit.ExecuteResponse
+import com.secverge.ai.data.models.cockpit.ExecutionPayload
+import com.secverge.ai.data.models.cockpit.ProviderStreamRequest
+import com.secverge.ai.data.network.ProviderStreamParser
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.secverge.ai.data.models.cockpit.RouteRequest
 import com.secverge.ai.data.models.cockpit.SwitchRequest
 import com.secverge.ai.data.network.SECVergeApi
@@ -79,14 +84,14 @@ class CockpitRepository(
         snapshotId: String? = null,
         routeId: String? = null
     ) = runCatching {
-        api.execute(
-            ExecuteRequest(
-                switchId = switchId,
-                snapshotId = snapshotId,
-                routeId = routeId,
-                prompt = prompt,
-                model = model
-            )
-        )
+        val started = System.nanoTime()
+        val body = api.streamModel(ProviderStreamRequest(prompt, model))
+        val answer = withContext(Dispatchers.IO) {
+            body.use { ProviderStreamParser.read(it.charStream().buffered(), model) }
+        }
+        if (com.secverge.ai.BuildConfig.DEBUG) {
+            android.util.Log.i("SECVergeModel", "provider_model=${answer.providerModel} status=complete elapsedMs=${(System.nanoTime() - started) / 1_000_000}")
+        }
+        ExecuteResponse(execution = ExecutionPayload(response = answer.text, selectedModel = answer.providerModel))
     }
 }

@@ -44,11 +44,9 @@ enum class DelphiStage(
 data class DelphiUiState(
     val question: String = "",
     val context: String = "",
+    val runId: String? = null,
     val participants: List<DelphiParticipant> = listOf(
-        DelphiParticipant("Ask Hachy / Gemma"),
-        DelphiParticipant("Llama"),
-        DelphiParticipant("Mistral"),
-        DelphiParticipant("Qwen")
+        DelphiParticipant("Model A"), DelphiParticipant("Model B")
     ),
     val stage: DelphiStage = DelphiStage.Blind,
     val runtimeOk: Boolean = false,
@@ -74,7 +72,7 @@ data class DelphiUiState(
     val canBlindRound: Boolean
         get() = question.isNotBlank() &&
             selectedModels.size >= 2 &&
-            !isLoading
+            !blindRoundComplete && !isLoading
 
     val canReveal: Boolean
         get() = blindRoundComplete &&

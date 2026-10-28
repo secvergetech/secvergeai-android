@@ -134,7 +134,7 @@ private fun AICouncilContent(
                             )
 
                             Text(
-                                text = "Choose at least two independent models. Gemma moderates the debate and prepares the final synthesis.",
+                                text = "Choose at least two independent models. Their live perspectives are sent to Gemma for a final consensus.",
                                 color = TextSecondary
                             )
 
@@ -185,7 +185,7 @@ private fun AICouncilContent(
                             OutlinedTextField(
                                 value = state.question,
                                 onValueChange = onQuestion,
-                                enabled = state.stage == CouncilStage.Configure,
+                                enabled = state.stage == CouncilStage.Configure && !state.isLoading,
                                 modifier = Modifier.fillMaxWidth(),
                                 minLines = 4,
                                 label = {
@@ -223,7 +223,7 @@ private fun AICouncilContent(
                             ) {
                                 Column {
                                     Text(
-                                        text = "Live debate room",
+                                        text = "Live model council",
                                         color = TextPrimary,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -383,7 +383,7 @@ private fun AICouncilContent(
                                     "Creating the council chamber…"
 
                                 CouncilStage.Debate ->
-                                    "The council is reasoning locally…"
+                                    "Waiting for the live Council response…"
 
                                 CouncilStage.Consensus ->
                                     "Gemma is finalizing consensus…"

@@ -266,28 +266,10 @@ private fun DelphiControls(
                 style = MaterialTheme.typography.titleMedium
             )
 
-            state.participants.chunked(2).forEach { row ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    row.forEach { participant ->
-                        DelphiParticipantButton(
-                            name = participant.name,
-                            selected = participant.selected,
-                            enabled = !state.isLoading,
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                onToggleParticipant(participant.name)
-                            }
-                        )
-                    }
-
-                    if (row.size == 1) {
-                        Box(modifier = Modifier.weight(1f))
-                    }
-                }
-            }
+            Text(
+                text = "Production assigns blind labels and keeps actual model identities hidden. Selected panel: ${state.selectedModels.joinToString()}",
+                color = TextSecondary
+            )
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -297,7 +279,7 @@ private fun DelphiControls(
                     text = if (state.activeAction == "test") {
                         "Testing…"
                     } else {
-                        "Test Gemma MAX"
+                        "Test Gemma"
                     },
                     enabled = state.canTestGemmaMax,
                     primary = true,
@@ -406,7 +388,7 @@ private fun DelphiWorkspace(
                             state.debated -> "Ready to converge"
                             state.revealed -> "Positions revealed"
                             state.blindRoundComplete -> "Blind views collected"
-                            state.runtimeOk -> "Gemma MAX ready"
+                            state.runtimeOk -> "Gemma live response verified"
                             else -> "Ready"
                         },
                         color = if (state.runtimeOk || state.blindRoundComplete) {
@@ -421,7 +403,7 @@ private fun DelphiWorkspace(
 
             if (state.entries.isEmpty()) {
                 Text(
-                    text = "Run Blind Round first. Gemma MAX retry and rotating moderator fallback are active.",
+                    text = "Run Blind Round to collect live independent submissions. Reveal shows the collected text; Debate and Converge call the production API.",
                     color = TextSecondary,
                     style = MaterialTheme.typography.bodyLarge
                 )

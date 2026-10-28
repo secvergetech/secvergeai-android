@@ -25,8 +25,11 @@ object ApiClient {
     ): SECVergeApi {
 
         val loggingInterceptor = HttpLoggingInterceptor().apply {
+            redactHeader("Authorization")
+            redactHeader("Cookie")
+            redactHeader("Set-Cookie")
             level = if (isDebug) {
-                HttpLoggingInterceptor.Level.BODY
+                HttpLoggingInterceptor.Level.BASIC
             } else {
                 HttpLoggingInterceptor.Level.NONE
             }
@@ -43,7 +46,7 @@ object ApiClient {
                 val requestBuilder = chain
                     .request()
                     .newBuilder()
-                    .header("Accept", "application/json")
+                    .header("Accept", chain.request().header("Accept") ?: "application/json")
 
                 if (!token.isNullOrBlank()) {
                     requestBuilder.header(
@@ -53,6 +56,22 @@ object ApiClient {
                 }
 
                 chain.proceed(requestBuilder.build())
+            }
+            .addInterceptor { chain ->
+                val started = System.nanoTime()
+                val request = chain.request()
+                try {
+                    val response = chain.proceed(request)
+                    if (com.secverge.ai.BuildConfig.DEBUG) {
+                        android.util.Log.i("SECVergeHttp", "${request.method} ${request.url.encodedPath} HTTP ${response.code} elapsedMs=${(System.nanoTime() - started) / 1_000_000}")
+                    }
+                    response
+                } catch (failure: java.io.IOException) {
+                    if (com.secverge.ai.BuildConfig.DEBUG) {
+                        android.util.Log.i("SECVergeHttp", "${request.method} ${request.url.encodedPath} failed=${failure.javaClass.simpleName} elapsedMs=${(System.nanoTime() - started) / 1_000_000}")
+                    }
+                    throw failure
+                }
             }
             .addInterceptor(loggingInterceptor)
             .build()

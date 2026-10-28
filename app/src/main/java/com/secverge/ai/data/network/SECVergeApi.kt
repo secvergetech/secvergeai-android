@@ -34,6 +34,13 @@ import com.secverge.ai.data.models.humancouncil.HumanCouncilCreateRequest
 import com.secverge.ai.data.models.humancouncil.HumanCouncilCreateResponse
 import com.secverge.ai.data.models.humancouncil.HumanCouncilDirectRequest
 import com.secverge.ai.data.models.humancouncil.HumanCouncilDirectResponse
+import com.secverge.ai.data.models.cockpit.ProviderStreamRequest
+import okhttp3.ResponseBody
+import retrofit2.http.Headers
+import retrofit2.http.Streaming
+import com.secverge.ai.data.models.council.CouncilPerspectiveRequest
+import com.secverge.ai.data.models.council.CouncilConsensusRequest
+import com.secverge.ai.data.models.council.CouncilProviderResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -57,11 +64,22 @@ interface SECVergeApi {
     @POST("/api/v1/multillm/switch")
     suspend fun switchModel(@Body request: SwitchRequest): SwitchResponse
 
+    @Streaming
+    @Headers("Accept: text/event-stream")
+    @POST("/api/v1/multillm/stream")
+    suspend fun streamModel(@Body request: ProviderStreamRequest): ResponseBody
+
     @POST("/api/v1/multillm/execute")
     suspend fun execute(@Body request: ExecuteRequest): ExecuteResponse
 
     @GET("/api/v1/multillm/adapter-status")
     suspend fun adapterStatus(): AdapterStatusResponse
+
+    @POST("/api/v1/ai-council/provider-r4-perspective")
+    suspend fun councilPerspective(@Body request: CouncilPerspectiveRequest): CouncilProviderResponse
+
+    @POST("/api/v1/ai-council/provider-r4-consensus")
+    suspend fun councilConsensus(@Body request: CouncilConsensusRequest): CouncilProviderResponse
 
     @POST("/api/v1/council/create")
     suspend fun createCouncil(@Body request: CouncilCreateRequest): CouncilCreateResponse
