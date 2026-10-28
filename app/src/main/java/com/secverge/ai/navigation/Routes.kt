@@ -11,6 +11,6 @@ sealed class SECVergeRoute(val route: String, val label: String) {
     data object Delphi : SECVergeRoute("delphi", "Delphi")
 
     companion object {
-        val bottomDestinations = listOf(AskHachy, Cockpit, Council, HumanCouncil, Delphi)
+        val bottomDestinations = listOf(Home, AskHachy, Cockpit, Council, Delphi)
     }
 }

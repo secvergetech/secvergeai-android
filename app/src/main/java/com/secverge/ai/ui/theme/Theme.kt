@@ -26,6 +26,6 @@ fun SECVergeTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = SECVergeDarkColorScheme,
         typography = SECVergeTypography,
-        content = content
+        content = { com.secverge.ai.ui.components.LiquidBackdrop(content) }
     )
 }

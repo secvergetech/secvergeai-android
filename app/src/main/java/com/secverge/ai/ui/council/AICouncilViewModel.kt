@@ -12,6 +12,10 @@ class AICouncilViewModel(private val repository: AICouncilRepository) : ViewMode
     private val _uiState = MutableStateFlow(AICouncilUiState())
     val uiState = _uiState.asStateFlow()
 
+    fun startNewCouncil() {
+        if (!_uiState.value.isLoading) _uiState.value = AICouncilUiState()
+    }
+
     fun updateQuestion(value: String) {
         if (_uiState.value.stage == CouncilStage.Configure && !_uiState.value.isLoading) {
             _uiState.update { it.copy(question = value, errorMessage = null) }
@@ -36,10 +40,17 @@ class AICouncilViewModel(private val repository: AICouncilRepository) : ViewMode
     fun runDebate() {
         val state = _uiState.value
         if (!state.canDebate) return
-        val round = (state.contributions.maxOfOrNull { it.round } ?: 0) + 1
+        val latestRound = state.contributions.maxOfOrNull { it.round } ?: 0
+        val completedModels = state.contributions.filter { it.round == latestRound }
+            .map { it.model.substringBefore(" (").trim().lowercase() }.toSet()
+        // A retry resumes the incomplete round and keeps successful perspectives intact.
+        val pendingModels = state.selectedModels.filter { it.lowercase() !in completedModels }
+        val resuming = latestRound > 0 && pendingModels.isNotEmpty()
+        val round = if (resuming) latestRound else latestRound + 1
+        val models = if (resuming) pendingModels else state.selectedModels
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
         viewModelScope.launch {
-            for (model in state.selectedModels) {
+            for (model in models) {
                 val result = repository.perspective(state.question.trim(), model)
                 if (result.isFailure) { failed(result.exceptionOrNull()!!); return@launch }
                 val answer = result.getOrThrow()

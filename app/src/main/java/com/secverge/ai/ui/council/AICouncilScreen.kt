@@ -1,397 +1,62 @@
 package com.secverge.ai.ui.council
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.secverge.ai.ui.components.GlassCard
-import com.secverge.ai.ui.components.GradientButton
-import com.secverge.ai.ui.components.PremiumErrorCard
-import com.secverge.ai.ui.components.PremiumLoadingState
-import com.secverge.ai.ui.components.PremiumTopBar
-import com.secverge.ai.ui.theme.Cyan
-import com.secverge.ai.ui.theme.GlassBorder
-import com.secverge.ai.ui.theme.Indigo
-import com.secverge.ai.ui.theme.MidnightCanvas
-import com.secverge.ai.ui.theme.MidnightSurface
-import com.secverge.ai.ui.theme.MidnightSurfaceHigh
-import com.secverge.ai.ui.theme.SECVergeGradients
-import com.secverge.ai.ui.theme.SignatureEnd
-import com.secverge.ai.ui.theme.TextMuted
-import com.secverge.ai.ui.theme.TextPrimary
-import com.secverge.ai.ui.theme.TextSecondary
-import com.secverge.ai.ui.theme.Violet
+import com.secverge.ai.ui.components.*
+import com.secverge.ai.ui.theme.*
 
 @Composable
-fun AICouncilScreen(
-    viewModel: AICouncilViewModel
-) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
-
-    AICouncilContent(
-        state = state,
-        onQuestion = viewModel::updateQuestion,
-        onToggle = viewModel::toggleModel,
-        onCreate = viewModel::createCouncil,
-        onDebate = viewModel::runDebate,
-        onFinalize = viewModel::finalizeCouncil,
-        onDismissError = viewModel::dismissError
-    )
-}
-
-@Composable
-private fun AICouncilContent(
-    state: AICouncilUiState,
-    onQuestion: (String) -> Unit,
-    onToggle: (String) -> Unit,
-    onCreate: () -> Unit,
-    onDebate: () -> Unit,
-    onFinalize: () -> Unit,
-    onDismissError: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MidnightCanvas)
-            .imePadding()
-            .navigationBarsPadding()
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(240.dp)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Violet.copy(alpha = 0.22f),
-                            Color.Transparent
-                        )
-                    )
-                )
-        )
-
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            PremiumTopBar(
-                subtitle = "AI Council · Independent minds. One transparent consensus."
-            )
-
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    start = 16.dp,
-                    top = 12.dp,
-                    end = 16.dp,
-                    bottom = 120.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                item {
-                    GlassCard(
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Text(
-                                text = "Assemble the council",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = TextPrimary,
-                                fontWeight = FontWeight.Bold
-                            )
-
-                            Text(
-                                text = "Choose at least two independent models. Their live perspectives are sent to Gemma for a final consensus.",
-                                color = TextSecondary
-                            )
-
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                state.participants.forEach { model ->
-                                    Surface(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clickable {
-                                                onToggle(model.name)
-                                            },
-                                        color = if (model.selected) {
-                                            Indigo.copy(alpha = 0.35f)
-                                        } else {
-                                            MidnightSurfaceHigh
-                                        },
-                                        shape = RoundedCornerShape(14.dp),
-                                        border = BorderStroke(
-                                            width = 1.dp,
-                                            color = if (model.selected) {
-                                                Cyan.copy(alpha = 0.7f)
-                                            } else {
-                                                GlassBorder
-                                            }
-                                        )
-                                    ) {
-                                        Text(
-                                            text = model.name,
-                                            modifier = Modifier.padding(
-                                                vertical = 12.dp,
-                                                horizontal = 6.dp
-                                            ),
-                                            color = if (model.selected) {
-                                                TextPrimary
-                                            } else {
-                                                TextMuted
-                                            },
-                                            textAlign = TextAlign.Center,
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
-                                    }
-                                }
-                            }
-
-                            OutlinedTextField(
-                                value = state.question,
-                                onValueChange = onQuestion,
-                                enabled = state.stage == CouncilStage.Configure && !state.isLoading,
-                                modifier = Modifier.fillMaxWidth(),
-                                minLines = 4,
-                                label = {
-                                    Text("Question for the council")
-                                },
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = TextPrimary,
-                                    unfocusedTextColor = TextPrimary,
-                                    focusedBorderColor = Cyan,
-                                    unfocusedBorderColor = GlassBorder
-                                )
-                            )
-
-                            GradientButton(
-                                text = "Create Council",
-                                modifier = Modifier.fillMaxWidth(),
-                                enabled = state.canStart,
-                                loading = state.isLoading &&
-                                    state.stage == CouncilStage.Configure,
-                                onClick = onCreate
-                            )
-                        }
+fun AICouncilScreen(viewModel: AICouncilViewModel) {
+    val state by viewModel.uiState.collectAsState()
+    val keyboard=LocalSoftwareKeyboardController.current
+    var reset by remember {mutableStateOf(false)}
+    val setup=state.stage==CouncilStage.Configure
+    val complete=state.stage==CouncilStage.Consensus
+    val fullRound=state.selectedModels.all {name ->state.contributions.any{it.model.startsWith(name,ignoreCase=true)}}
+    Column(Modifier.fillMaxSize().imePadding()) {
+        StudioHeader("AI Council","More perspectives. A clearer decision.") {
+            GlassAction("New council","plus",!state.isLoading){if(state.contributions.isEmpty())viewModel.startNewCouncil() else reset=true}
+        }
+        StepRail(listOf("Question","Perspectives","Consensus"),if(setup)0 else if(complete)2 else 1)
+        LazyColumn(Modifier.weight(1f),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+            if(setup) {
+                item {LiquidPanel(Modifier.fillMaxWidth()) {
+                    GlassPill("THINK TOGETHER")
+                    Spacer(Modifier.height(14.dp))
+                    Text("One question.\nMultiple ways forward.",color=TextPrimary,style=MaterialTheme.typography.headlineMedium)
+                    Spacer(Modifier.height(10.dp))
+                    Text("Gather independent perspectives, then bring them together into a shared answer.",color=TextSecondary)
+                }}
+                item {StudioField(state.question,viewModel::updateQuestion,"What would you like to explore?",!state.isLoading)}
+                item {LiquidPanel(Modifier.fillMaxWidth()) {
+                    Text("Choose your council",color=TextPrimary,style=MaterialTheme.typography.titleMedium)
+                    Text("Select at least two models",color=TextSecondary,style=MaterialTheme.typography.bodySmall)
+                    Row(Modifier.fillMaxWidth().padding(top=14.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                        state.participants.forEach {member -> FilterChip(selected=member.selected,onClick={viewModel.toggleModel(member.name)},enabled=!state.isLoading,label={Text(member.name)},colors=FilterChipDefaults.filterChipColors(containerColor=androidx.compose.ui.graphics.Color.Transparent,labelColor=TextSecondary,selectedContainerColor=modelAccent(member.name).copy(alpha=.18f),selectedLabelColor=TextPrimary),leadingIcon={StudioIcon(if(member.selected)"check" else "plus",modelAccent(member.name),Modifier.size(16.dp))},modifier=Modifier.weight(1f))}
                     }
-                }
-
-                if (state.stage != CouncilStage.Configure) {
-                    item {
-                        GlassCard(
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text(
-                                        text = "Live model council",
-                                        color = TextPrimary,
-                                        fontWeight = FontWeight.Bold
-                                    )
-
-                                    Text(
-                                        text = "${state.selectedModels.size} models · Gemma moderator",
-                                        color = TextSecondary
-                                    )
-                                }
-
-                                AssistChip(
-                                    onClick = {},
-                                    label = {
-                                        Text(
-                                            if (state.isLoading) {
-                                                "Thinking"
-                                            } else {
-                                                "Ready"
-                                            }
-                                        )
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                items(
-                    items = state.contributions,
-                    key = { it.id }
-                ) { contribution ->
-                    AnimatedVisibility(
-                        visible = true,
-                        enter = fadeIn() +
-                            slideInVertically { it / 3 }
-                    ) {
-                        GlassCard(
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = contribution.model,
-                                        color = Cyan,
-                                        fontWeight = FontWeight.Bold
-                                    )
-
-                                    Text(
-                                        text = "Round ${contribution.round}",
-                                        color = TextMuted
-                                    )
-                                }
-
-                                Text(
-                                    text = contribution.content,
-                                    color = TextPrimary
-                                )
-                            }
-                        }
-                    }
-                }
-
-                if (state.stage == CouncilStage.Debate) {
-                    item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            GradientButton(
-                                text = "Run Debate",
-                                modifier = Modifier.weight(1f),
-                                enabled = state.canDebate,
-                                loading = state.isLoading,
-                                onClick = onDebate
-                            )
-
-                            GradientButton(
-                                text = "Finalize",
-                                modifier = Modifier.weight(1f),
-                                enabled = state.canFinalize,
-                                loading = false,
-                                onClick = onFinalize
-                            )
-                        }
-                    }
-                }
-
-                state.consensus?.let { consensus ->
-                    item {
-                        AnimatedVisibility(
-                            visible = true,
-                            enter = fadeIn() +
-                                slideInVertically { it / 2 }
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(
-                                        brush = SECVergeGradients.Signature,
-                                        shape = RoundedCornerShape(24.dp)
-                                    )
-                                    .padding(1.dp)
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(
-                                            color = MidnightSurface,
-                                            shape = RoundedCornerShape(23.dp)
-                                        )
-                                        .padding(20.dp),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Text(
-                                        text = "Gemma Consensus",
-                                        color = SignatureEnd,
-                                        style = MaterialTheme.typography.titleLarge,
-                                        fontWeight = FontWeight.Bold
-                                    )
-
-                                    Text(
-                                        text = consensus,
-                                        color = TextPrimary
-                                    )
-
-                                    Text(
-                                        text = "Glass Box trail preserved above",
-                                        color = TextSecondary
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                state.errorMessage?.let { message ->
-                    item {
-                        PremiumErrorCard(
-                            title = "Council operation interrupted",
-                            message = message,
-                            dismissLabel = "Dismiss",
-                            onDismiss = onDismissError
-                        )
-                    }
-                }
-
-                if (state.isLoading) {
-                    item {
-                        PremiumLoadingState(
-                            message = when (state.stage) {
-                                CouncilStage.Configure ->
-                                    "Creating the council chamber…"
-
-                                CouncilStage.Debate ->
-                                    "Waiting for the live Council response…"
-
-                                CouncilStage.Consensus ->
-                                    "Gemma is finalizing consensus…"
-                            }
-                        )
-                    }
-                }
+                }}
+            } else {
+                item {LiquidPanel(Modifier.fillMaxWidth()) {GlassPill("${state.selectedModels.size} MODEL PERSPECTIVES");Spacer(Modifier.height(12.dp));Text(state.question,color=TextPrimary,style=MaterialTheme.typography.titleMedium)}}
+                items(state.contributions,key={it.id}) {entry ->ResponseCard(entry.model.substringBefore(" ("),entry.content,details="Round ${entry.round}\nProvider: ${entry.model}",compact=true)}
+                state.consensus?.let{answer ->item {Text("Shared answer",color=TextPrimary,style=MaterialTheme.typography.titleLarge);Spacer(Modifier.height(12.dp));ResponseCard("Gemma",answer)}}
+                if(state.isLoading)item {ModelWorking("Council")}
             }
+            state.errorMessage?.let {error ->item {PremiumErrorCard(message=error,dismissLabel="Dismiss",onDismiss=viewModel::dismissError)}}
+        }
+        Column(Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+            val label=if(setup)"Gather perspectives" else if(complete)"Start a new council" else if(!fullRound && state.contributions.isNotEmpty())"Resume perspectives" else if(!fullRound)"Gather perspectives" else "Build a shared answer"
+            GradientButton(label,Modifier.fillMaxWidth(),enabled=if(setup)state.canStart else if(complete)true else if(!fullRound)state.canDebate else state.canFinalize,loading=state.isLoading) {
+                keyboard?.hide()
+                if(setup){viewModel.createCouncil();viewModel.runDebate()} else if(complete)reset=true else if(!fullRound)viewModel.runDebate() else viewModel.finalizeCouncil()
+            }
+            Text(if(setup)"Your selected models answer independently." else if(complete)"Review each perspective above to see how the answer formed." else "You can read each perspective as it arrives.",color=TextMuted,style=MaterialTheme.typography.labelSmall)
         }
     }
+    if(reset)AlertDialog(onDismissRequest={reset=false},title={Text("Start a new council?")},text={Text("This clears the current council from this screen.")},confirmButton={TextButton(onClick={viewModel.startNewCouncil();reset=false}){Text("New council")}},dismissButton={TextButton(onClick={reset=false}){Text("Keep reviewing")}})
 }

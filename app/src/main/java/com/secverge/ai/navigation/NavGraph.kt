@@ -64,7 +64,7 @@ fun SECVergeNavGraph() {
 
     val shellRoutes = SECVergeRoute
         .bottomDestinations
-        .map { it.route } + SECVergeRoute.Home.route
+        .map { it.route } + SECVergeRoute.HumanCouncil.route
 
     if (currentRoute in shellRoutes) {
         AppScaffold(
@@ -159,7 +159,11 @@ private fun SECVergeNavHost(
             HomeScreen(
                 viewModel = homeViewModel,
                 onOpenFeature = { route ->
-                    navController.navigate(route.route)
+                    navController.navigate(route.route) {
+                        launchSingleTop = true
+                        popUpTo(SECVergeRoute.Home.route) { saveState = true }
+                        restoreState = true
+                    }
                 },
                 onLogout = {
                     navController.navigate(
@@ -230,7 +234,13 @@ private fun SECVergeNavHost(
                     HumanCouncilRepository(featureDependencies.api)
                 )
             )
-            HumanCouncilScreen(humanCouncilViewModel)
+            HumanCouncilScreen(humanCouncilViewModel) {
+                navController.navigate(SECVergeRoute.Cockpit.route) {
+                    launchSingleTop = true
+                    popUpTo(SECVergeRoute.Home.route) { saveState = true }
+                    restoreState = true
+                }
+            }
         }
 
         composable(SECVergeRoute.Delphi.route) {

@@ -11,6 +11,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -42,6 +43,7 @@ fun GradientButton(
     Box(
         modifier = modifier
             .defaultMinSize(minHeight = 54.dp)
+            .alpha(if (enabled || loading) 1f else 0.42f)
             .background(
                 brush = SECVergeGradients.PrimaryButton,
                 shape = RoundedCornerShape(

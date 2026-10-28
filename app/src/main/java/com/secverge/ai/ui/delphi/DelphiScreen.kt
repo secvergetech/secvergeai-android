@@ -9,580 +9,84 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
-import com.secverge.ai.ui.components.GlassCard
-import com.secverge.ai.ui.components.PremiumErrorCard
-import com.secverge.ai.ui.components.PremiumTopBar
-import com.secverge.ai.ui.theme.Cyan
-import com.secverge.ai.ui.theme.GlassBorder
-import com.secverge.ai.ui.theme.GlassSurface
-import com.secverge.ai.ui.theme.MidnightCanvas
-import com.secverge.ai.ui.theme.SECVergeDimens
-import com.secverge.ai.ui.theme.SECVergeGradients
-import com.secverge.ai.ui.theme.TextMuted
-import com.secverge.ai.ui.theme.TextPrimary
-import com.secverge.ai.ui.theme.TextSecondary
+import com.secverge.ai.ui.components.*
+import com.secverge.ai.ui.theme.*
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 @Composable
-fun DelphiScreen(
-    viewModel: DelphiViewModel
-) {
+fun DelphiScreen(viewModel: DelphiViewModel) {
     val state by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MidnightCanvas)
-            .imePadding()
-            .navigationBarsPadding()
-            .verticalScroll(rememberScrollState())
-            .padding(SECVergeDimens.Space3),
-        verticalArrangement = Arrangement.spacedBy(SECVergeDimens.Space3)
-    ) {
-        PremiumTopBar(
-            subtitle = "Delphi AI · Blind reasoning. Transparent convergence."
-        )
-
-        DelphiHeroCard()
-
-        DelphiStepRail(
-            activeStage = state.stage
-        )
-
-        DelphiControls(
-            state = state,
-            onQuestionChange = viewModel::updateQuestion,
-            onContextChange = viewModel::updateContext,
-            onToggleParticipant = viewModel::toggleParticipant,
-            onTestGemmaMax = viewModel::testGemmaMax,
-            onBlindRound = viewModel::runBlindRound,
-            onReveal = viewModel::revealPositions,
-            onDebate = viewModel::runDebate,
-            onConverge = viewModel::converge,
-            onExportPdf = {
-                val result = runCatching {
-                    exportDelphiPdf(
-                        context = context,
-                        state = state
-                    )
-                }.fold(
-                    onSuccess = { it },
-                    onFailure = {
-                        "PDF export failed: ${it.message ?: "Unknown error"}"
-                    }
-                )
-
-                viewModel.markPdfExported(result)
-
-                Toast.makeText(
-                    context,
-                    result,
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-        )
-
-        DelphiWorkspace(
-            state = state
-        )
-
-        state.errorMessage?.let { message ->
-            PremiumErrorCard(
-                title = "Delphi operation interrupted",
-                message = message,
-                dismissLabel = "Dismiss",
-                onDismiss = viewModel::dismissError
-            )
+    val context=LocalContext.current
+    val keyboard=LocalSoftwareKeyboardController.current
+    var extraContext by remember {mutableStateOf(false)}
+    var reset by remember {mutableStateOf(false)}
+    val started=state.runId!=null || state.isLoading
+    val step=if(state.converged || state.debated)3 else if(state.revealed)2 else if(state.blindRoundComplete)1 else 0
+    Column(Modifier.fillMaxSize().imePadding()) {
+        StudioHeader("Delphi","Independent ideas. A confident next step.") {
+            GlassAction("New Delphi decision","plus",!state.isLoading){if(state.entries.isEmpty())viewModel.updateQuestion("") else reset=true}
         }
-    }
-}
-
-@Composable
-private fun DelphiHeroCard() {
-    GlassCard(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = "SECVERGE AI · DELPHI CONSENSUS LAB",
-                color = Cyan,
-                style = MaterialTheme.typography.labelLarge
-            )
-
-            Text(
-                text = "Blind views first. Debate second. Converge with confidence.",
-                style = MaterialTheme.typography.headlineLarge.copy(
-                    brush = SECVergeGradients.Signature
-                )
-            )
-
-            Text(
-                text = "A clean Delphi workroom: collect independent model views without cross-contamination, reveal the positions, debate the differences, and produce a final executive consensus.",
-                color = TextSecondary,
-                style = MaterialTheme.typography.bodyLarge
-            )
-        }
-    }
-}
-
-@Composable
-private fun DelphiStepRail(
-    activeStage: DelphiStage
-) {
-    DelphiStage.values().toList().chunked(2).forEach { row ->
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            row.forEach { stage ->
-                val active = stage.ordinal <= activeStage.ordinal
-
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(
-                            color = if (active) {
-                                Cyan.copy(alpha = 0.14f)
-                            } else {
-                                GlassSurface.copy(alpha = 0.70f)
-                            },
-                            shape = RoundedCornerShape(18.dp)
-                        )
-                        .border(
-                            width = 1.dp,
-                            color = if (active) {
-                                Cyan.copy(alpha = 0.55f)
-                            } else {
-                                GlassBorder
-                            },
-                            shape = RoundedCornerShape(18.dp)
-                        )
-                        .padding(14.dp)
-                ) {
-                    Column {
-                        Text(
-                            text = stage.label,
-                            color = if (active) TextPrimary else TextMuted,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-
-                        Text(
-                            text = stage.subtitle,
-                            color = TextSecondary,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
+        StepRail(listOf("Blind","Reveal","Debate","Consensus"),step)
+        LazyColumn(Modifier.weight(1f),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+            if(!started && !state.blindRoundComplete) {
+                item {LiquidPanel(Modifier.fillMaxWidth()) {
+                    GlassPill("DECIDE WITH CLARITY")
+                    Spacer(Modifier.height(14.dp))
+                    Text("Let ideas speak\nbefore identities.",color=TextPrimary,style=MaterialTheme.typography.headlineMedium)
+                    Spacer(Modifier.height(10.dp))
+                    Text("Two independent answers stay sealed until you reveal them. Compare their thinking, then build a final recommendation.",color=TextSecondary)
+                }}
+                item {StudioField(state.question,viewModel::updateQuestion,"What decision are you making?",!state.isLoading)}
+                item {
+                    TextButton(onClick={extraContext=!extraContext}){Text(if(extraContext)"Hide extra context" else "+ Add context or constraints",color=Cyan)}
+                    if(extraContext)StudioField(state.context,viewModel::updateContext,"Context (optional)",!state.isLoading)
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DelphiControls(
-    state: DelphiUiState,
-    onQuestionChange: (String) -> Unit,
-    onContextChange: (String) -> Unit,
-    onToggleParticipant: (String) -> Unit,
-    onTestGemmaMax: () -> Unit,
-    onBlindRound: () -> Unit,
-    onReveal: () -> Unit,
-    onDebate: () -> Unit,
-    onConverge: () -> Unit,
-    onExportPdf: () -> Unit
-) {
-    GlassCard(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text(
-                text = "Delphi Controls",
-                color = TextPrimary,
-                style = MaterialTheme.typography.titleLarge
-            )
-
-            Text(
-                text = "One decision question. Independent first views. Then reveal, debate, and converge.",
-                color = TextSecondary,
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            DelphiTextArea(
-                title = "Decision question",
-                value = state.question,
-                placeholder = "Example: Should SECVerge AI launch Delphi as a premium boardroom feature?",
-                enabled = !state.isLoading,
-                onValueChange = onQuestionChange
-            )
-
-            DelphiTextArea(
-                title = "Context / constraints",
-                value = state.context,
-                placeholder = "Add business context, risks, constraints, desired output style, or decision criteria.",
-                enabled = !state.isLoading,
-                onValueChange = onContextChange
-            )
-
-            Text(
-                text = "Participants",
-                color = TextPrimary,
-                style = MaterialTheme.typography.titleMedium
-            )
-
-            Text(
-                text = "Production assigns blind labels and keeps actual model identities hidden. Selected panel: ${state.selectedModels.joinToString()}",
-                color = TextSecondary
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                DelphiActionButton(
-                    text = if (state.activeAction == "test") {
-                        "Testing…"
-                    } else {
-                        "Test Gemma"
-                    },
-                    enabled = state.canTestGemmaMax,
-                    primary = true,
-                    modifier = Modifier.weight(1f),
-                    onClick = onTestGemmaMax
-                )
-
-                DelphiActionButton(
-                    text = if (state.activeAction == "blind") {
-                        "Collecting…"
-                    } else {
-                        "1. Blind Round"
-                    },
-                    enabled = state.canBlindRound,
-                    primary = false,
-                    modifier = Modifier.weight(1f),
-                    onClick = onBlindRound
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                DelphiActionButton(
-                    text = if (state.activeAction == "reveal") {
-                        "Revealing…"
-                    } else {
-                        "2. Reveal"
-                    },
-                    enabled = state.canReveal,
-                    primary = false,
-                    modifier = Modifier.weight(1f),
-                    onClick = onReveal
-                )
-
-                DelphiActionButton(
-                    text = if (state.activeAction == "debate") {
-                        "Debating…"
-                    } else {
-                        "3. Debate"
-                    },
-                    enabled = state.canDebate,
-                    primary = false,
-                    modifier = Modifier.weight(1f),
-                    onClick = onDebate
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                DelphiActionButton(
-                    text = if (state.activeAction == "converge") {
-                        "Converging…"
-                    } else {
-                        "4. Converge"
-                    },
-                    enabled = state.canConverge,
-                    primary = false,
-                    modifier = Modifier.weight(1f),
-                    onClick = onConverge
-                )
-
-                DelphiActionButton(
-                    text = "Export PDF",
-                    enabled = state.canExportPdf,
-                    primary = false,
-                    modifier = Modifier.weight(1f),
-                    onClick = onExportPdf
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun DelphiWorkspace(
-    state: DelphiUiState
-) {
-    GlassCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 300.dp)
-    ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Column {
-                    Text(
-                        text = "SECVerge Delphi",
-                        color = TextPrimary,
-                        style = MaterialTheme.typography.titleLarge
-                    )
-
-                    Text(
-                        text = when {
-                            state.isLoading -> "Working…"
-                            state.converged -> "Consensus ready"
-                            state.debated -> "Ready to converge"
-                            state.revealed -> "Positions revealed"
-                            state.blindRoundComplete -> "Blind views collected"
-                            state.runtimeOk -> "Gemma live response verified"
-                            else -> "Ready"
-                        },
-                        color = if (state.runtimeOk || state.blindRoundComplete) {
-                            Cyan
-                        } else {
-                            TextSecondary
-                        },
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-
-            if (state.entries.isEmpty()) {
-                Text(
-                    text = "Run Blind Round to collect live independent submissions. Reveal shows the collected text; Debate and Converge call the production API.",
-                    color = TextSecondary,
-                    style = MaterialTheme.typography.bodyLarge
-                )
             } else {
-                state.entries.forEach { entry ->
-                    GlassCard(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .animateContentSize(),
-                        elevated = false
-                    ) {
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = entry.title,
-                                color = Cyan,
-                                style = MaterialTheme.typography.titleMedium
-                            )
-
-                            Text(
-                                text = if (entry.hiddenUntilReveal && !state.revealed) {
-                                    "Blind view collected privately. Tap 2. Reveal to show all positions together."
-                                } else {
-                                    entry.content
-                                },
-                                color = TextPrimary,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
+                item {LiquidPanel(Modifier.fillMaxWidth()) {GlassPill(if(state.converged)"DECISION READY" else "TWO INDEPENDENT VOICES");Spacer(Modifier.height(12.dp));Text(state.question,color=TextPrimary,style=MaterialTheme.typography.titleMedium)}}
+            }
+            items(state.entries.filterNot{it.content==state.consensus && state.converged},key={it.id}) {entry ->
+                if(entry.hiddenUntilReveal && !state.revealed) {
+                    LiquidPanel(Modifier.fillMaxWidth()) {
+                        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                            StudioIcon("lock",Cyan,Modifier.size(24.dp))
+                            Column {Text(entry.title,color=TextPrimary,style=MaterialTheme.typography.titleMedium);Text("Answer sealed · reveal when ready",color=TextSecondary,style=MaterialTheme.typography.bodySmall)}
                         }
                     }
-                }
+                } else ResponseCard(entry.model ?: entry.title,entry.content,details=entry.title,compact=state.converged)
             }
+            state.consensus?.let {answer -> item {Text("Your final recommendation",color=TextPrimary,style=MaterialTheme.typography.titleLarge);Spacer(Modifier.height(12.dp));ResponseCard("Delphi consensus",answer)}}
+            if(state.isLoading)item {ModelWorking("Delphi")}
+            state.errorMessage?.let {error ->item{PremiumErrorCard(message=error,dismissLabel="Dismiss",onDismiss=viewModel::dismissError)}}
+            state.exportedPdfPath?.let {path ->item {LiquidPanel(Modifier.fillMaxWidth()){Text(if(path.startsWith("PDF export failed"))path else "PDF saved to Downloads",color=if(path.startsWith("PDF export failed"))MaterialTheme.colorScheme.error else Cyan)}}}
+        }
+        Column(Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+            val label=when {state.converged -> "Export decision as PDF";state.debated -> "Build final recommendation";state.revealed -> "Compare perspectives";state.blindRoundComplete -> "Reveal answers";else -> "Collect blind answers"}
+            val enabled=when {state.converged -> state.canExportPdf;state.debated -> state.canConverge;state.revealed -> state.canDebate;state.blindRoundComplete -> state.canReveal;else ->state.canBlindRound}
+            GradientButton(label,Modifier.fillMaxWidth(),enabled,loading=state.isLoading) {
+                keyboard?.hide()
+                when {state.converged -> {
+                    val result=runCatching{exportDelphiPdf(context,state)}.getOrElse{"PDF export failed: ${it.message ?: "Please try again"}"}
+                    viewModel.markPdfExported(result)
+                    Toast.makeText(context,if(result.startsWith("PDF export failed"))result else "Decision PDF saved to Downloads",Toast.LENGTH_LONG).show()
+                };state.debated ->viewModel.converge();state.revealed ->viewModel.runDebate();state.blindRoundComplete ->viewModel.revealPositions();else ->viewModel.runBlindRound()}
+            }
+            Text(when {state.converged -> "Your decision trail is included in the PDF.";state.blindRoundComplete && !state.revealed ->"Both answers are ready. Reveal them together.";else ->"Follow each step at your own pace."},color=TextMuted,style=MaterialTheme.typography.labelSmall)
         }
     }
-}
-
-@Composable
-private fun DelphiTextArea(
-    title: String,
-    value: String,
-    placeholder: String,
-    enabled: Boolean,
-    onValueChange: (String) -> Unit
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text(
-            text = title,
-            color = TextPrimary,
-            style = MaterialTheme.typography.labelLarge
-        )
-
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            enabled = enabled,
-            modifier = Modifier.fillMaxWidth(),
-            textStyle = MaterialTheme.typography.bodyLarge.copy(
-                color = TextPrimary
-            ),
-            cursorBrush = SolidColor(Cyan),
-            decorationBox = { innerTextField ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 110.dp)
-                        .background(
-                            color = GlassSurface.copy(alpha = 0.72f),
-                            shape = RoundedCornerShape(SECVergeDimens.RadiusMedium)
-                        )
-                        .border(
-                            width = 1.dp,
-                            color = GlassBorder,
-                            shape = RoundedCornerShape(SECVergeDimens.RadiusMedium)
-                        )
-                        .padding(16.dp)
-                ) {
-                    if (value.isBlank()) {
-                        Text(
-                            text = placeholder,
-                            color = TextMuted,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                    }
-
-                    innerTextField()
-                }
-            }
-        )
-    }
-}
-
-@Composable
-private fun DelphiParticipantButton(
-    name: String,
-    selected: Boolean,
-    enabled: Boolean,
-    modifier: Modifier,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = modifier
-            .background(
-                color = if (selected) {
-                    Cyan.copy(alpha = 0.15f)
-                } else {
-                    GlassSurface.copy(alpha = 0.72f)
-                },
-                shape = RoundedCornerShape(SECVergeDimens.RadiusMedium)
-            )
-            .border(
-                width = 1.dp,
-                color = if (selected) {
-                    Cyan
-                } else {
-                    GlassBorder
-                },
-                shape = RoundedCornerShape(SECVergeDimens.RadiusMedium)
-            )
-            .clickable(enabled = enabled) {
-                onClick()
-            }
-            .padding(horizontal = 8.dp, vertical = 13.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = if (selected) "✓ $name" else name,
-            color = if (selected) TextPrimary else TextMuted,
-            style = MaterialTheme.typography.labelLarge
-        )
-    }
-}
-
-@Composable
-private fun DelphiActionButton(
-    text: String,
-    enabled: Boolean,
-    primary: Boolean,
-    modifier: Modifier,
-    onClick: () -> Unit
-) {
-    val shapedModifier = if (primary) {
-        modifier.background(
-            brush = SECVergeGradients.Signature,
-            shape = RoundedCornerShape(SECVergeDimens.RadiusMedium)
-        )
-    } else {
-        modifier.background(
-            color = GlassSurface.copy(alpha = 0.78f),
-            shape = RoundedCornerShape(SECVergeDimens.RadiusMedium)
-        )
-    }
-
-    Box(
-        modifier = shapedModifier
-            .heightIn(min = 54.dp)
-            .border(
-                width = 1.dp,
-                color = if (enabled) {
-                    Cyan.copy(alpha = 0.50f)
-                } else {
-                    GlassBorder
-                },
-                shape = RoundedCornerShape(SECVergeDimens.RadiusMedium)
-            )
-            .clickable(enabled = enabled) {
-                onClick()
-            }
-            .padding(horizontal = 8.dp, vertical = 14.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            color = if (enabled) TextPrimary else TextMuted,
-            style = MaterialTheme.typography.labelLarge
-        )
-    }
+    if(reset)AlertDialog(onDismissRequest={reset=false},title={Text("Start a new decision?")},text={Text("Export your current decision first if you want to keep it.")},confirmButton={TextButton(onClick={viewModel.updateQuestion("");viewModel.updateContext("");reset=false}){Text("New decision")}},dismissButton={TextButton(onClick={reset=false}){Text("Keep reviewing")}})
 }
 
 private fun exportDelphiPdf(
